@@ -151,7 +151,7 @@
   <div class="card"><div class="chart"><canvas id="cBalance"></canvas></div></div>
   <div class="sec">Spending per month</div>
   <div class="card"><div class="chart"><canvas id="cExpenses"></canvas></div></div>
-  <div class="sec">Next 12 months — tap a month for details</div>
+  <div class="sec">Next 12 months — balance at the end of each</div>
   <div class="card" id="futureList"></div>
 </div>
 
@@ -207,7 +207,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null;
@@ -277,9 +277,11 @@ function render(){
   $('itemsAll').innerHTML = ia;
   // future list
   let fl='';
+  const balByKey = {}; d.forecast.forEach(x=>balByKey[x.key]=x.balance);
   d.future.forEach(m=>{
     const big = m.lines.filter(l=>['Daily','Weekly','Monthly'].indexOf(l.freq)<0).map(l=>l.item+' ('+Math.round(l.amount).toLocaleString()+')').join(', ');
-    fl += '<details><summary class="row"><div class="l"><div class="t">'+m.label+'</div><div class="d">'+(big||'regular only')+'</div></div><div class="v">'+SAR(m.total)+'</div></summary>' + m.lines.map(l=>'<div class="row" style="padding-left:32px"><div class="l"><div class="t mini">'+l.item+'</div></div><div class="v mini">'+SAR(l.amount)+'</div></div>').join('') + '</details>';
+    const bal = balByKey[m.key];
+    fl += '<details><summary class="row"><div class="l"><div class="t">'+m.label+'</div><div class="d">spend '+SAR(m.total)+(big?' · '+big:'')+'</div></div><div class="v"><div class="'+(bal<0?'neg':'blue')+'">'+SAR(bal)+'</div><div class="mini" style="text-align:right">end of month</div></div></summary>' + m.lines.map(l=>'<div class="row" style="padding-left:32px"><div class="l"><div class="t mini">'+l.item+'</div></div><div class="v mini">'+SAR(l.amount)+'</div></div>').join('') + '</details>';
   });
   $('futureList').innerHTML = fl;
   // savings

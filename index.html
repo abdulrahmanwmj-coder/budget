@@ -207,6 +207,9 @@
 <div class="toast" id="toast"></div>
 
 <script>
+const APP_VERSION = '10';
+// reload the page itself when a newer version has been published (home-screen apps cache the old one)
+(function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null;
 const SAR = v => (v === null || v === undefined || isNaN(v)) ? '—' : (v < 0 ? '−' : '') + 'SAR ' + Math.abs(v).toLocaleString('en-US', {maximumFractionDigits: 0});
 const $ = id => document.getElementById(id);

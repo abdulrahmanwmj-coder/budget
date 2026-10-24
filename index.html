@@ -80,9 +80,10 @@
   <div class="card">
     <div class="big" id="tTotal" onclick="toggleTotal()" style="cursor:pointer"></div>
     <div class="hero" id="tHero"></div>
-    <div class="row"><div class="l"><div class="t">Current account</div></div><div class="v"><input type="number" inputmode="decimal" id="inCurrent"></div></div>
-    <div class="row"><div class="l"><div class="t">Savings account</div></div><div class="v"><input type="number" inputmode="decimal" id="inSavings"></div></div>
-    <div class="row"><div class="l"><div class="t">Credit card (prepaid)</div></div><div class="v"><input type="number" inputmode="decimal" id="inCard"></div></div>
+    <div class="row"><div class="l"><div class="t">Current</div></div><div class="v"><input type="number" inputmode="decimal" id="inCurrent"></div></div>
+    <div class="row"><div class="l"><div class="t">Saving</div></div><div class="v"><input type="number" inputmode="decimal" id="inSavings"></div></div>
+    <div class="row"><div class="l"><div class="t">Credit</div></div><div class="v"><input type="number" inputmode="decimal" id="inCard"></div></div>
+    <div class="row"><div class="l"><div class="t">Cash</div></div><div class="v"><input type="number" inputmode="decimal" id="inCash"></div></div>
   </div>
   <button class="btn" id="btnBal" onclick="saveBalances()">Update balances</button>
 
@@ -238,8 +239,8 @@ function render(){
   const d=D;
   $('dateLine').textContent = hijriToday() + ' · ' + d.hijri;
   drawTotal();
-  $('tHero').textContent = 'current ' + SAR(d.current) + ' · savings ' + SAR(d.savings) + ' · card ' + SAR(d.card||0);
-  $('inCurrent').value = d.current; $('inSavings').value = d.savings; $('inCard').value = d.card||0;
+  $('tHero').textContent = 'current ' + SAR(d.current) + ' · saving ' + SAR(d.savings) + ' · credit ' + SAR(d.card||0) + ' · cash ' + SAR(d.cash||0);
+  $('inCurrent').value = d.current; $('inSavings').value = d.savings; $('inCard').value = d.card||0; $('inCash').value = d.cash||0;
   // plan check
   if (d.delta === null) { $('pcExpected').textContent='—'; $('pcDelta').textContent='Set a starting point'; $('pcDelta').className='v mini'; $('pcBase').textContent='Update your balances once to start tracking'; $('pcEnd').textContent=SAR(d.expectedEnd); }
   else {
@@ -308,7 +309,7 @@ function drawLoan(){ const s=D.loanSeries; mk('cLoan',{type:'line',data:{labels:
 
 // ---- actions ----
 function busy(b){ document.querySelectorAll('.btn').forEach(x=>x.disabled=b); }
-function saveBalances(){ busy(true); call('updateBalances', num($('inCurrent').value), num($('inSavings').value), num($('inCard').value)).then(d=>{busy(false);set(d);toast('Balances saved');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
+function saveBalances(){ busy(true); call('updateBalances', num($('inCurrent').value), num($('inSavings').value), num($('inCard').value), num($('inCash').value)).then(d=>{busy(false);set(d);toast('Balances saved');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
 function togglePaid(item,paid){ call('setPaid',item,paid).then(d=>{set(d);toast(paid?'Marked paid':'Marked unpaid');}).catch(e=>toast('Error: '+e.message)); }
 function openEdit(row){ editRow=row; const it = row? D.items.find(x=>x.row===row):null; $('editTitle').textContent = it?'Edit item':'Add item'; $('eDelete').style.display = it?'block':'none';
   $('eName').value=it?it.item:''; $('eAmount').value=it?it.amount:''; $('eFreq').value=it?it.freq:'Monthly';

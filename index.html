@@ -1,1 +1,326 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Budget</title><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="apple-mobile-web-app-title" content="Budget"><meta name="theme-color" content="#000000"><style>html,body{margin:0;padding:0;height:100%;background:#000;overflow:hidden}iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#000}</style></head><body><iframe src="https://script.google.com/macros/s/AKfycbyAAc6-uZlkamULOPhmBeidPdMRJH85b7qP9shhFj-L8W-kFVnPdiUytl4vv4YUJUTsAg/exec" allow="clipboard-write"></iframe></body></html>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Budget">
+<meta name="theme-color" content="#000000">
+<title>Budget</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#F2F2F7;--card:#fff;--text:#000;--sub:#6e6e73;--line:#e5e5ea;--blue:#007AFF;--red:#FF3B30;--green:#34C759;--orange:#FF9500}
+  @media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#fff;--sub:#98989d;--line:#2c2c2e}}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;font-size:17px;-webkit-font-smoothing:antialiased}
+  .page{display:none;padding:0 16px 96px;max-width:640px;margin:0 auto}
+  .page.on{display:block}
+  h1{font-size:34px;font-weight:700;letter-spacing:-.4px;margin:28px 0 2px}
+  .sub{color:var(--sub);font-size:15px;margin-bottom:16px}
+  .sec{font-size:13px;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin:22px 0 8px 16px}
+  .card{background:var(--card);border-radius:12px;overflow:hidden}
+  .row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);min-height:48px;gap:12px}
+  .row:last-child{border-bottom:0}
+  .row .l{flex:1;min-width:0}.row .t{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row .d{font-size:13px;color:var(--sub);margin-top:2px}
+  .row .v{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .big{font-size:40px;font-weight:700;letter-spacing:-.8px;font-variant-numeric:tabular-nums;padding:16px 16px 4px}
+  .hero{padding:4px 16px 16px;color:var(--sub);font-size:15px}
+  .pos{color:var(--green)}.neg{color:var(--red)}.warn{color:var(--orange)}.blue{color:var(--blue)}
+  input,select{font:inherit;font-size:17px;color:var(--text);background:transparent;border:0;outline:0;text-align:right;width:100%;font-variant-numeric:tabular-nums}
+  select{text-align:right;-webkit-appearance:none;appearance:none;background:transparent}
+  input[type=date]{text-align:right}
+  .btn{display:block;width:100%;padding:14px;border:0;border-radius:12px;background:var(--blue);color:#fff;font:inherit;font-size:17px;font-weight:600;margin-top:12px}
+  .btn.sec2{background:var(--card);color:var(--blue)}
+  .btn.danger{background:var(--card);color:var(--red)}
+  .btn:disabled{opacity:.5}
+  .tabs{position:fixed;bottom:0;left:0;right:0;background:rgba(249,249,249,.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--line);display:flex;padding:6px 0 calc(6px + env(safe-area-inset-bottom))}
+  @media (prefers-color-scheme:dark){.tabs{background:rgba(28,28,30,.94)}}
+  .tab{flex:1;text-align:center;font-size:10px;color:var(--sub);background:none;border:0;font-family:inherit;padding:4px 0}
+  .tab .ic{font-size:22px;display:block;line-height:1.1}
+  .tab.on{color:var(--blue)}
+  .chart{padding:12px 12px 8px;height:220px}
+  .chart canvas{width:100%!important;height:100%!important}
+  .chart[data-empty]{position:relative}.chart[data-empty]::after{content:"Builds up each time you update your balances";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:14px;text-align:center;padding:0 24px}
+  .sw{position:relative;width:51px;height:31px;border-radius:16px;background:#e9e9ea;flex:none;transition:.2s}
+  .sw.on{background:var(--green)}.sw::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:.2s}
+  .sw.on::after{left:22px}
+  .bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;background:var(--blue)}
+  .mini{font-size:13px;color:var(--sub)}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:90px;background:rgba(0,0,0,.85);color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
+  .toast.on{opacity:1}
+  .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:var(--sub);background:var(--bg);z-index:9}
+  .pill{font-size:12px;padding:2px 8px;border-radius:10px;background:var(--line);color:var(--sub)}
+  details summary{list-style:none;cursor:pointer}details summary::-webkit-details-marker{display:none}
+  .link{color:var(--blue);background:none;border:0;font:inherit;font-size:15px;padding:0}
+  .refresh{position:fixed;top:calc(14px + env(safe-area-inset-top));right:16px;width:36px;height:36px;border-radius:18px;border:0;background:var(--card);color:var(--blue);font-size:20px;line-height:36px;text-align:center;padding:0;z-index:5;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+  .refresh.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+  .ptr{position:fixed;top:calc(8px + env(safe-area-inset-top));left:0;right:0;text-align:center;font-size:13px;color:var(--sub);opacity:0;transition:.2s;pointer-events:none}.ptr.on{opacity:1}
+</style>
+</head>
+<body>
+<div class="loading" id="loading">Loading…</div>
+<div class="loading" id="gate" style="display:none;flex-direction:column;padding:24px">
+  <div style="width:100%;max-width:360px">
+    <h1 style="margin-top:0">Budget</h1>
+    <div class="sub">Enter your passphrase to open the app on this device.</div>
+    <div class="card"><div class="row"><div class="l"><div class="t">Passphrase</div></div><input id="gateIn" type="password" placeholder="••••••••" autocomplete="current-password"></div></div>
+    <button class="btn" onclick="saveToken()">Open</button>
+    <div class="mini" id="gateMsg" style="margin-top:12px;text-align:center"></div>
+  </div>
+</div>
+<button class="refresh" id="btnRefresh" onclick="refresh()" title="Refresh">↻</button>
+<div class="ptr" id="ptr">Release to refresh</div>
+
+<!-- TODAY -->
+<div class="page on" id="p-today">
+  <h1>Today</h1>
+  <div class="sub" id="dateLine"></div>
+
+  <div class="card">
+    <div class="big" id="tTotal"></div>
+    <div class="hero" id="tHero"></div>
+    <div class="row"><div class="l"><div class="t">Current account</div></div><div class="v"><input type="number" inputmode="decimal" id="inCurrent"></div></div>
+    <div class="row"><div class="l"><div class="t">Savings account</div></div><div class="v"><input type="number" inputmode="decimal" id="inSavings"></div></div>
+  </div>
+  <button class="btn" id="btnBal" onclick="saveBalances()">Update balances</button>
+
+  <div class="sec">Plan check</div>
+  <div class="card">
+    <div class="row"><div class="l"><div class="t">You should have today</div><div class="d" id="pcBase"></div></div><div class="v" id="pcExpected"></div></div>
+    <div class="row"><div class="l"><div class="t">Ahead / behind plan</div><div class="d">actual minus expected</div></div><div class="v" id="pcDelta"></div></div>
+    <div class="row"><div class="l"><div class="t">Expected end of month</div></div><div class="v" id="pcEnd"></div></div>
+    <div class="row"><div class="l"><div class="t">Salary received this month</div><div class="d" id="pcSalSub"></div></div><div class="sw" id="pcSal" onclick="toggleSalary()"></div></div>
+  </div>
+
+  <div class="sec">This month</div>
+  <div class="card">
+    <div class="row"><div class="l"><div class="t">Planned spending</div></div><div class="v" id="tmPlanned"></div></div>
+    <div class="row"><div class="l"><div class="t">Should be spent by now</div><div class="d" id="tmDays"></div></div><div class="v" id="tmSpent"></div></div>
+    <div class="row"><div class="l"><div class="t">Still to spend</div></div><div class="v" id="tmRemaining"></div></div>
+    <div class="row"><div class="l"><div class="t">Per day for the rest of the month</div></div><div class="v" id="tmDaily"></div></div>
+  </div>
+
+  <div class="sec">Salary plan</div>
+  <div class="card">
+    <div class="row"><div class="l"><div class="t">Move to savings on salary day</div><div class="d" id="spRegular"></div></div><div class="v blue" id="spMove"></div></div>
+    <div class="row"><div class="l"><div class="t">Never go below (sinking fund)</div><div class="d">covers rent, Morafiqeen, tuition, trips</div></div><div class="v" id="spMin"></div></div>
+  </div>
+
+  <div class="sec">Coming up</div>
+  <div class="card" id="upcoming"></div>
+</div>
+
+<!-- ITEMS -->
+<div class="page" id="p-items">
+  <h1>Items</h1>
+  <div class="sub" id="itemsSub"></div>
+  <div class="sec">Due this month — switch = paid</div>
+  <div class="mini" style="margin:-4px 16px 8px">Monthly bills are assumed paid; switch one off if it isn't yet. Big items start unpaid.</div>
+  <div class="card" id="itemsMonth"></div>
+  <div class="sec">All items</div>
+  <div class="card" id="itemsAll"></div>
+  <button class="btn" onclick="openEdit(null)">Add item</button>
+</div>
+
+<!-- EDIT (sub-page) -->
+<div class="page" id="p-edit">
+  <h1 id="editTitle">Add item</h1>
+  <div class="sub">Changes go straight into the sheet.</div>
+  <div class="card">
+    <div class="row"><div class="l"><div class="t">Name</div></div><div class="v" style="flex:1.3"><input id="eName" placeholder="e.g. Water bill"></div></div>
+    <div class="row"><div class="l"><div class="t">Amount (SAR)</div></div><div class="v"><input type="number" inputmode="decimal" id="eAmount"></div></div>
+    <div class="row"><div class="l"><div class="t">How often</div></div><div class="v"><select id="eFreq" onchange="editHint()">
+      <option>Daily</option><option>Weekly</option><option selected>Monthly</option><option>Quarterly</option><option>Annually</option><option>Annually (Hijri)</option><option>One Time</option></select></div></div>
+    <div class="row" id="eDateRow"><div class="l"><div class="t" id="eDateLabel">Date</div><div class="d" id="eDateHint"></div></div><div class="v"><input type="date" id="eDate"><input id="eHijri" placeholder="18/11" style="display:none"></div></div>
+    <div class="row"><div class="l"><div class="t">Stop after (optional)</div><div class="d">last month this is paid</div></div><div class="v"><input type="date" id="eStop"></div></div>
+    <div class="row" id="eSpreadRow"><div class="l"><div class="t">Spread over the month</div><div class="d">counts per day, like groceries (fuel, clothes, toys…)</div></div><div class="sw" id="eSpread" onclick="toggleSpread()"></div></div>
+  </div>
+  <button class="btn" onclick="saveEdit()">Save</button>
+  <button class="btn danger" id="eDelete" onclick="deleteEdit()">Delete item</button>
+  <button class="btn sec2" onclick="go('items')">Cancel</button>
+</div>
+
+<!-- FORECAST -->
+<div class="page" id="p-forecast">
+  <h1>Forecast</h1>
+  <div class="sub">From the Total Plan sheet, month by month.</div>
+  <div class="sec">Balance if the plan holds</div>
+  <div class="card"><div class="chart"><canvas id="cBalance"></canvas></div></div>
+  <div class="sec">Spending per month</div>
+  <div class="card"><div class="chart"><canvas id="cExpenses"></canvas></div></div>
+  <div class="sec">Next 12 months — tap a month for details</div>
+  <div class="card" id="futureList"></div>
+</div>
+
+<!-- SAVINGS -->
+<div class="page" id="p-savings">
+  <h1>Savings</h1>
+  <div class="sub">Where the money should go each salary.</div>
+  <div class="card">
+    <div class="row"><div class="l"><div class="t">Minimum to save</div><div class="d">keeps the big bills funded</div></div><div class="v" id="svMin"></div></div>
+    <div class="row"><div class="l"><div class="t">Maximum you could save</div><div class="d">salary minus regular living</div></div><div class="v" id="svMax"></div></div>
+    <div class="row"><div class="l"><div class="t">Recommended transfer</div><div class="d">next month's regular spend stays in current</div></div><div class="v blue" id="svMove"></div></div>
+  </div>
+  <div class="sec">Min vs max per month</div>
+  <div class="card"><div class="chart"><canvas id="cSave"></canvas></div></div>
+  <div class="sec">Your balance vs the plan</div>
+  <div class="card"><div class="chart"><canvas id="cLog"></canvas></div></div>
+  <div class="sec">Settings</div>
+  <div class="card">
+    <div class="row"><div class="l"><div class="t">Salary day of month</div><div class="d">used for the plan check</div></div><div class="v"><input type="number" inputmode="numeric" id="sSalaryDay" onchange="saveSalaryDay()"></div></div>
+    <div class="row"><div class="l"><div class="t">Monthly salary</div><div class="d">from This Month!A39</div></div><div class="v" id="sSalary"></div></div>
+  </div>
+  <button class="btn sec2" id="btnClose" onclick="closeMonth()">Close this month (save a snapshot)</button>
+</div>
+
+<!-- LOAN -->
+<div class="page" id="p-loan">
+  <h1>Home</h1>
+  <div class="sub">Test a purchase; results come from the Home Loan sheet.</div>
+  <div class="card">
+    <div class="row"><div class="l"><div class="t">Home price today</div></div><div class="v"><input type="number" inputmode="decimal" id="lPrice"></div></div>
+    <div class="row"><div class="l"><div class="t">Loan from the bank</div></div><div class="v"><input type="number" inputmode="decimal" id="lLoan"></div></div>
+    <div class="row"><div class="l"><div class="t">Flat rate % / year</div></div><div class="v"><input type="number" inputmode="decimal" step="0.1" id="lRate"></div></div>
+    <div class="row"><div class="l"><div class="t">Loan years</div></div><div class="v"><input type="number" inputmode="numeric" id="lYears"></div></div>
+    <div class="row"><div class="l"><div class="t">Fees % of price</div></div><div class="v"><input type="number" inputmode="decimal" step="0.5" id="lFees"></div></div>
+    <div class="row"><div class="l"><div class="t">Home value growth % / year</div></div><div class="v"><input type="number" inputmode="decimal" step="0.5" id="lGrowth"></div></div>
+    <div class="row"><div class="l"><div class="t">Safety cash to keep</div></div><div class="v"><input type="number" inputmode="decimal" id="lFloor"></div></div>
+    <div class="row"><div class="l"><div class="t">Purchase month to test</div></div><div class="v"><input type="month" id="lMonth"></div></div>
+  </div>
+  <button class="btn" onclick="saveLoan()">Run scenario</button>
+  <div class="sec">Results</div>
+  <div class="card" id="loanResults"></div>
+  <div class="sec">Buy vs keep renting</div>
+  <div class="card"><div class="chart"><canvas id="cLoan"></canvas></div></div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" data-p="today" onclick="go('today')"><span class="ic">☀︎</span>Today</button>
+  <button class="tab" data-p="items" onclick="go('items')"><span class="ic">☰</span>Items</button>
+  <button class="tab" data-p="forecast" onclick="go('forecast')"><span class="ic">📈</span>Forecast</button>
+  <button class="tab" data-p="savings" onclick="go('savings')"><span class="ic">◎</span>Savings</button>
+  <button class="tab" data-p="loan" onclick="go('loan')"><span class="ic">⌂</span>Home</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+let D = null, charts = {}, editRow = null;
+const SAR = v => (v === null || v === undefined || isNaN(v)) ? '—' : (v < 0 ? '−' : '') + 'SAR ' + Math.abs(v).toLocaleString('en-US', {maximumFractionDigits: 0});
+const $ = id => document.getElementById(id);
+const dark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),1800); }
+function go(p){ document.querySelectorAll('.page').forEach(x=>x.classList.remove('on')); $('p-'+p).classList.add('on'); document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p)); window.scrollTo(0,0); if(p==='forecast') drawForecast(); if(p==='savings') drawSavings(); if(p==='loan') drawLoan(); }
+const API_URL='https://script.google.com/macros/s/AKfycbyAAc6-uZlkamULOPhmBeidPdMRJH85b7qP9shhFj-L8W-kFVnPdiUytl4vv4YUJUTsAg/exec';
+function token(){ try{ return localStorage.getItem('budgetToken')||''; }catch(e){ return ''; } }
+function showGate(msg){ $('loading').style.display='none'; $('gate').style.display='flex'; $('gateMsg').textContent=msg||''; setTimeout(()=>$('gateIn').focus(),50); }
+function saveToken(){ const v=$('gateIn').value.trim(); if(!v) return; try{ localStorage.setItem('budgetToken',v); }catch(e){} $('gateMsg').textContent='Checking…'; call('getData').then(d=>{ $('gate').style.display='none'; set(d); }).catch(e=>{ $('gateMsg').textContent=e.message; }); }
+function call(fn, ...args){
+  return fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({token:token(),fn,args})})
+    .then(r=>r.json())
+    .then(j=>{ if(!j.ok){ if(/passphrase/i.test(j.error)) showGate(token()?'Wrong passphrase':''); throw new Error(j.error); } return j.data; });
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Enter' && document.activeElement && document.activeElement.id==='gateIn') saveToken(); });
+function load(){ if(!token()){ showGate(''); return Promise.resolve(); } return call('getData').then(set).catch(e=>{ if(!/passphrase/i.test(e.message)) $('loading').textContent='Could not load: '+e.message; }); }
+function refresh(){ const b=$('btnRefresh'); if(b.classList.contains('spin')) return; b.classList.add('spin'); call('getData').then(d=>{set(d);toast('Updated');}).catch(e=>toast('Error: '+e.message)).finally(()=>b.classList.remove('spin')); }
+// pull to refresh (touch)
+let ptrY=null, ptrArmed=false;
+document.addEventListener('touchstart',e=>{ ptrY = (window.scrollY<=0) ? e.touches[0].clientY : null; ptrArmed=false; },{passive:true});
+document.addEventListener('touchmove',e=>{ if(ptrY===null) return; const dy=e.touches[0].clientY-ptrY; ptrArmed = dy>80; $('ptr').classList.toggle('on', dy>30); },{passive:true});
+document.addEventListener('touchend',()=>{ $('ptr').classList.remove('on'); if(ptrArmed) refresh(); ptrY=null; ptrArmed=false; });
+function set(d){ D=d; $('loading').style.display='none'; render(); }
+
+function render(){
+  const d=D;
+  $('dateLine').textContent = hijriToday() + ' · ' + d.hijri;
+  $('tTotal').textContent = SAR(d.total);
+  $('tHero').textContent = 'current ' + SAR(d.current) + ' · savings ' + SAR(d.savings);
+  $('inCurrent').value = d.current; $('inSavings').value = d.savings;
+  // plan check
+  if (d.delta === null) { $('pcExpected').textContent='—'; $('pcDelta').textContent='Set a starting point'; $('pcDelta').className='v mini'; $('pcBase').textContent='Update your balances once to start tracking'; $('pcEnd').textContent=SAR(d.expectedEnd); }
+  else {
+    $('pcExpected').textContent = SAR(d.expectedToday);
+    const bd=new Date(d.baseline.date); $('pcBase').textContent=SAR(d.baseline.total)+' on '+bd.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' − '+SAR(d.spentSince)+' planned spend since';
+    const e=$('pcDelta'); e.textContent=(d.delta>=0?'+':'')+SAR(d.delta); e.className='v '+(d.delta>=0?'pos':'neg');
+    $('pcEnd').textContent = SAR(d.expectedEnd);
+  }
+  $('pcSal').classList.toggle('on', !!d.salaryReceived); $('pcSalSub').textContent = ({'auto':'detected from your balance','manual-yes':'set by you','manual-no':'set by you: not yet','none':'not seen yet · switch on when it lands'})[d.salaryMode] || '';
+  $('tmPlanned').textContent=SAR(d.planned); $('tmSpent').textContent=SAR(d.spentPlan); $('tmRemaining').textContent=SAR(d.remaining); $('tmDaily').textContent=SAR(d.dailyLeft);
+  $('tmDays').textContent = d.elapsed+' of '+d.daysInMonth+' days gone · '+d.left+' left';
+  $('spMove').textContent=SAR(d.moveToSavings); $('spRegular').textContent='keep '+SAR(d.regularNext)+' for next month'; $('spMin').textContent=SAR(d.minFund);
+  // upcoming: unpaid fixed items this month + next 2 months' big lines
+  let up='';
+  d.thisMonth.filter(x=>x.big && !x.paid).forEach(x=> up+=rowHtml(x.item,'this month · '+x.freq+' · not paid yet', SAR(x.due)));
+  d.future.slice(0,2).forEach(m=> m.lines.filter(l=>['Daily','Weekly','Monthly'].indexOf(l.freq)<0).forEach(l=> up+=rowHtml(l.item, m.label+' · '+l.freq, SAR(l.amount))));
+  $('upcoming').innerHTML = up || rowHtml('Nothing big coming up','','');
+  // items
+  $('itemsSub').textContent = d.monthLabel+' · planned '+SAR(d.planned)+' · remaining '+SAR(d.remaining);
+  let im='';
+  d.thisMonth.forEach(x=>{
+    const pct = x.due? Math.round(100*(x.due-x.remaining)/x.due):0;
+    const sub = x.fixed ? (x.paid?'paid':'not paid yet') : SAR(x.perDay)+' / day · '+SAR(x.remaining)+' left';
+    const ctl = x.fixed ? '<div class="sw '+(x.paid?'on':'')+'" onclick="togglePaid(\''+esc(x.item)+'\','+(!x.paid)+')"></div>' : '<div class="v">'+SAR(x.due)+'</div>';
+    const bar = x.fixed ? '' : '<div class="bar"><i style="width:'+pct+'%"></i></div>';
+    im += '<div class="row"><div class="l"><div class="t">'+x.item+(x.fixed?' <span class="v mini">'+SAR(x.due)+'</span>':'')+'</div><div class="d">'+sub+'</div>'+bar+'</div>'+ctl+'</div>';
+  });
+  $('itemsMonth').innerHTML = im || rowHtml('Nothing due this month','','');
+  let ia='';
+  d.items.forEach(it=> ia += '<div class="row" onclick="openEdit('+it.row+')"><div class="l"><div class="t">'+it.item+'</div><div class="d">'+it.freq+(it.add?' · '+fmtAdd(it.add):'')+(it.stop?' · stops '+fmtAdd(it.stop):'')+'</div></div><div class="v">'+SAR(it.amount)+' <span class="mini">›</span></div></div>');
+  $('itemsAll').innerHTML = ia;
+  // future list
+  let fl='';
+  d.future.forEach(m=>{
+    const big = m.lines.filter(l=>['Daily','Weekly','Monthly'].indexOf(l.freq)<0).map(l=>l.item+' ('+Math.round(l.amount).toLocaleString()+')').join(', ');
+    fl += '<details><summary class="row"><div class="l"><div class="t">'+m.label+'</div><div class="d">'+(big||'regular only')+'</div></div><div class="v">'+SAR(m.total)+'</div></summary>' + m.lines.map(l=>'<div class="row" style="padding-left:32px"><div class="l"><div class="t mini">'+l.item+'</div></div><div class="v mini">'+SAR(l.amount)+'</div></div>').join('') + '</details>';
+  });
+  $('futureList').innerHTML = fl;
+  // savings
+  const f0 = d.forecast[1] || d.forecast[0] || {};
+  $('svMin').textContent=SAR(f0.minSave); $('svMax').textContent=SAR(f0.maxSave); $('svMove').textContent=SAR(d.moveToSavings);
+  $('sSalaryDay').value=d.salaryDay; $('sSalary').textContent=SAR(d.salary);
+  // loan
+  const L = {}; d.loan.forEach(r=>L[r.label]=r.value);
+  $('lPrice').value = num(L['Home price TODAY']); $('lLoan').value=num(L['Loan from the bank']); $('lRate').value=+(num(L['Loan interest rate per year (flat)'])*100).toFixed(2);
+  $('lYears').value=num(L['Loan length (years)']); $('lFees').value=+(num(L['Government + bank fees (% of home price)'])*100).toFixed(1); $('lGrowth').value=+(num(L['Expected rise in home value per year'])*100).toFixed(1);
+  $('lFloor').value=num(L['Safety cash to keep untouched']);
+  const pm = L['Purchase month you want to try (type a date)']; if(pm){ const dt=new Date(pm); if(!isNaN(dt)) $('lMonth').value = dt.getFullYear()+'-'+('0'+(dt.getMonth()+1)).slice(-2); }
+  const show = ['Home price in the month you buy','Cash you must have on purchase day','Monthly loan instalment','First month you could afford to buy','Cash left the day after buying','How much more you pay per month than rent now','Month when owning becomes better than renting','Is the instalment within that limit?','Biggest loan that fits the limit'];
+  let lr=''; show.forEach(k=>{ let v=L[k]; if(typeof v==='number') v=SAR(v); if(v instanceof Date) v=v.toLocaleDateString(); const bad = (k==='Cash left the day after buying' && num(L[k])<0) || (k==='Is the instalment within that limit?' && String(v).indexOf('No')===0); lr += '<div class="row"><div class="l"><div class="t" style="white-space:normal">'+k+'</div></div><div class="v '+(bad?'neg':'')+'" style="white-space:normal;text-align:right;max-width:45%">'+(v===undefined?'—':v)+'</div></div>'; });
+  $('loanResults').innerHTML = lr;
+  const cur = document.querySelector('.page.on').id.replace('p-','');
+  if(cur==='forecast') drawForecast(); if(cur==='savings') drawSavings(); if(cur==='loan') drawLoan();
+}
+function num(v){ return typeof v==='number'?v:(parseFloat(v)||0); }
+function hijriToday(){ try{ return new Intl.DateTimeFormat('en-u-ca-islamic-umalqura',{day:'numeric',month:'long',year:'numeric'}).format(new Date()).replace(' AH',''); }catch(e){ return ''; } }
+function esc(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function rowHtml(t,d,v){ return '<div class="row"><div class="l"><div class="t">'+t+'</div>'+(d?'<div class="d">'+d+'</div>':'')+'</div><div class="v">'+v+'</div></div>'; }
+function fmtAdd(v){ if(/^\d{4}-\d{2}-\d{2}/.test(v)){ const p=v.slice(0,10).split('-'); const d=new Date(+p[0],+p[1]-1,+p[2]); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); } return v; }
+
+// ---- charts ----
+function mk(id, cfg){ if(charts[id]) charts[id].destroy(); const base = {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:cfg.data.datasets.length>1,labels:{boxWidth:10,font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}; cfg.options=Object.assign(base,cfg.options||{}); charts[id]=new Chart($(id),cfg); }
+function drawForecast(){ const f=D.forecast; mk('cBalance',{type:'line',data:{labels:f.map(x=>x.label),datasets:[{data:f.map(x=>x.balance),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,fill:{target:'origin',above:'rgba(0,122,255,.08)'}}]}}); mk('cExpenses',{type:'bar',data:{labels:f.slice(0,24).map(x=>x.label),datasets:[{data:f.slice(0,24).map(x=>x.expenses),backgroundColor:f.slice(0,24).map(x=>x.big?'#FF9500':'#007AFF'),borderRadius:3}]}}); }
+function drawSavings(){ const f=D.forecast.slice(0,24); mk('cSave',{type:'bar',data:{labels:f.map(x=>x.label),datasets:[{label:'Min',data:f.map(x=>x.minSave),backgroundColor:'#8e8e93',borderRadius:3},{label:'Max',data:f.map(x=>x.maxSave),backgroundColor:'#007AFF',borderRadius:3}]}}); const l=D.log; if(!l.length){ if(charts.cLog){charts.cLog.destroy();delete charts.cLog;} const c=$('cLog').getContext('2d'); c.clearRect(0,0,$('cLog').width,$('cLog').height); $('cLog').parentElement.setAttribute('data-empty','1'); } else { $('cLog').parentElement.removeAttribute('data-empty'); mk('cLog',{type:'line',data:{labels:l.map(x=>new Date(x.t).toLocaleDateString('en-GB',{day:'numeric',month:'short'})),datasets:[{label:'Actual',data:l.map(x=>x.total),borderColor:'#007AFF',borderWidth:2,pointRadius:2,tension:.2},{label:'Expected',data:l.map(x=>x.expected),borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:.2}]}}); } }
+function drawLoan(){ const s=D.loanSeries; mk('cLoan',{type:'line',data:{labels:s.map(x=>x.label),datasets:[{label:'Keep renting',data:s.map(x=>x.rent),borderColor:'#8e8e93',borderWidth:2,pointRadius:0,tension:.2},{label:'Buy (cash + home − loan)',data:s.map(x=>x.wealth),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.2}]}}); }
+
+// ---- actions ----
+function busy(b){ document.querySelectorAll('.btn').forEach(x=>x.disabled=b); }
+function saveBalances(){ busy(true); call('updateBalances', num($('inCurrent').value), num($('inSavings').value)).then(d=>{busy(false);set(d);toast('Balances saved');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
+function togglePaid(item,paid){ call('setPaid',item,paid).then(d=>{set(d);toast(paid?'Marked paid':'Marked unpaid');}).catch(e=>toast('Error: '+e.message)); }
+function openEdit(row){ editRow=row; const it = row? D.items.find(x=>x.row===row):null; $('editTitle').textContent = it?'Edit item':'Add item'; $('eDelete').style.display = it?'block':'none';
+  $('eName').value=it?it.item:''; $('eAmount').value=it?it.amount:''; $('eFreq').value=it?it.freq:'Monthly';
+  $('eDate').value = (it && it.add && /^\d{4}-/.test(it.add)) ? it.add.slice(0,10) : ''; $('eHijri').value = (it && it.add && !/^\d{4}-/.test(it.add)) ? it.add : '';
+  $('eStop').value = it && it.stop ? it.stop.slice(0,10) : ''; $('eSpread').classList.toggle('on', !!(it && it.spread)); editHint(); go('edit'); }
+function toggleSpread(){ if(!editRow) return toast('Save the item first, then set this'); const it=D.items.find(x=>x.row===editRow); const on=!it.spread; $('eSpread').classList.toggle('on',on); call('setSpread',it.item,on).then(d=>{set(d);toast(on?'Spread over the month':'Paid once a month');}).catch(e=>toast('Error: '+e.message)); }
+function editHint(){ const f=$('eFreq').value; const r=$('eDateRow'); const h={'Quarterly':'first payment date (sets the 3-month cycle)','Annually':'first month it is due (leave empty for January)','Annually (Hijri)':'Hijri day/month, e.g. 18/11','One Time':'the date it is due'}[f]; r.style.display = h?'flex':'none'; $('eSpreadRow').style.display = f==='Monthly'?'flex':'none'; $('eDateHint').textContent=h||''; $('eDateLabel').textContent = f==='One Time'?'Due date':(f==='Annually (Hijri)'?'Hijri date':'Date'); $('eDate').style.display = f==='Annually (Hijri)'?'none':'block'; $('eHijri').style.display = f==='Annually (Hijri)'?'block':'none'; }
+function saveEdit(){ const f=$('eFreq').value; const o={row:editRow,item:$('eName').value.trim(),amount:num($('eAmount').value),freq:f,add: f==='Annually (Hijri)'?$('eHijri').value.trim():($('eDate').value||''),stop:$('eStop').value||''}; if(!o.item) return toast('Name is required'); busy(true); call(editRow?'editExpense':'addExpense',o).then(d=>{busy(false);set(d);go('items');toast('Saved to sheet');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
+let armed={};
+function arm(id,label,fn){ const b=$(id); if(armed[id]){ clearTimeout(armed[id]); armed[id]=null; b.textContent=label; fn(); return; } b.textContent='Tap again to confirm'; armed[id]=setTimeout(()=>{armed[id]=null;b.textContent=label;},3000); }
+function deleteEdit(){ arm('eDelete','Delete item',()=>{ busy(true); call('deleteExpense',editRow).then(d=>{busy(false);set(d);go('items');toast('Deleted');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }); }
+function saveLoan(){ busy(true); const m=$('lMonth').value; call('updateLoan',{price:num($('lPrice').value),loan:num($('lLoan').value),rate:num($('lRate').value),years:num($('lYears').value),fees:num($('lFees').value),growth:num($('lGrowth').value),floor:num($('lFloor').value),month:m?m+'-01':null}).then(d=>{busy(false);set(d);toast('Scenario updated');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
+function toggleSalary(){ const on=!D.salaryReceived; $('pcSal').classList.toggle('on',on); call('setSetting','salaryReceived:'+D.monthKey, on?'true':'false').then(d=>{set(d);toast(on?'Salary counted':'Salary not counted');}).catch(e=>toast('Error: '+e.message)); }
+function saveSalaryDay(){ call('setSetting','salaryDay',num($('sSalaryDay').value)).then(d=>{set(d);toast('Saved');}); }
+function closeMonth(){ arm('btnClose','Close this month (save a snapshot)',()=>{ call('monthlyClose').then(d=>{set(d);toast('Month closed');}); }); }
+load();
+</script>
+</body>
+</html>

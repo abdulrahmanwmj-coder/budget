@@ -148,7 +148,7 @@
   <div class="card"><div class="chart"><canvas id="cBalance"></canvas></div></div>
   <div class="sec">Expenses per cycle</div>
   <div class="card"><div class="chart"><canvas id="cExpenses"></canvas></div></div>
-  <div class="sec">Next 12 cycles — opening · expenses · savings → cumulative</div>
+  <div class="sec" id="fcTitle">Every cycle — opening · expenses · savings → cumulative</div>
   <div class="card" id="futureList"></div>
 </div>
 
@@ -205,7 +205,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '20';
+const APP_VERSION = '21';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -263,7 +263,7 @@ function render(){
   // upcoming: unpaid big items this cycle + next 2 cycles' big lines
   let up='';
   d.thisMonth.filter(x=>x.big && !x.paid).forEach(x=> up+=rowHtml(x.item,'this cycle · '+x.freq+' · not paid yet', SAR(x.due)));
-  d.future.slice(0,2).forEach(m=> m.lines.filter(l=>['Daily','Weekly','Monthly'].indexOf(l.freq)<0).forEach(l=> up+=rowHtml(l.item, m.window+' · '+l.freq, SAR(l.amount))));
+  d.future.slice(0,2).forEach(m=> m.lines.filter(l=>l.freq==='Big').forEach(l=> up+=rowHtml(l.item, m.label+' · '+m.window, SAR(l.amount))));
   $('upcoming').innerHTML = up || rowHtml('Nothing big coming up','','');
   // items
   $('itemsSub').textContent = d.cycle.label+' · planned '+SAR(d.planned)+' · remaining '+SAR(d.remaining);
@@ -281,14 +281,14 @@ function render(){
   $('itemsAll').innerHTML = ia;
   // future list
   let fl='';
-  const fcByKey = {}; d.forecast.forEach(x=>fcByKey[x.key]=x);
-  d.future.forEach(m=>{
-    const big = m.lines.filter(l=>['Daily','Weekly','Monthly'].indexOf(l.freq)<0).map(l=>l.item+' ('+Math.round(l.amount).toLocaleString()+')').join(', ');
-    const fc = fcByKey[m.key] || {};
-    const sv = fc.savings;
-    fl += '<details><summary class="row"><div class="l"><div class="t">'+m.label+' <span class="mini">'+m.window+'</span></div><div class="d">opening '+SAR(fc.opening)+' − expenses '+SAR(m.total)+' = <span class="'+(sv<0?'neg':'pos')+'">'+(sv>=0?'+':'')+SAR(sv)+'</span>'+(big?' · '+big:'')+'</div></div><div class="v"><div class="blue">'+SAR(fc.cumulative)+'</div><div class="mini" style="text-align:right">cumulative</div></div></summary>' + m.lines.map(l=>'<div class="row" style="padding-left:32px"><div class="l"><div class="t mini">'+l.item+'</div></div><div class="v mini">'+SAR(l.amount)+'</div></div>').join('') + '</details>';
+  const rows = d.forecast.filter(x=>x.key>=d.cycle.key);
+  rows.forEach(fc=>{
+    const sv = fc.savings; const big = fc.big;
+    const yearBreak = /Jan \d\d$/.test(fc.label) ? ' style="border-top:2px solid var(--sub)"' : '';
+    fl += '<details><summary class="row"'+yearBreak+'><div class="l"><div class="t">'+fc.label+' <span class="mini">'+fc.window+'</span></div><div class="d">opening '+SAR(fc.opening)+' − expenses '+SAR(fc.expenses)+' = <span class="'+(sv<0?'neg':'pos')+'">'+(sv>=0?'+':'')+SAR(sv)+'</span>'+(big?' · '+big:'')+'</div></div><div class="v"><div class="blue">'+SAR(fc.cumulative)+'</div><div class="mini" style="text-align:right">cumulative</div></div></summary>' + (fc.lines||[]).map(l=>'<div class="row" style="padding-left:32px"><div class="l"><div class="t mini">'+l[0]+(l[2]?' <span class="pill">big</span>':'')+'</div></div><div class="v mini">'+SAR(l[1])+'</div></div>').join('') + '</details>';
   });
   $('futureList').innerHTML = fl;
+  const last = rows[rows.length-1]; $('fcTitle').textContent = 'Every cycle to '+(last?last.label:'')+' — opening · expenses · savings → cumulative';
   // savings
   $('svPlan').textContent=SAR(d.savingsPlan); $('svPlanSub').textContent='opening '+SAR(d.opening)+' − expenses '+SAR(d.planned);
   $('svTarget').textContent=SAR(d.cumTarget); $('svNow').textContent=SAR(d.savings);

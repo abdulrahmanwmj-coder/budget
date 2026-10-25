@@ -91,7 +91,8 @@
   <div class="card">
     <div class="row"><div class="l"><div class="t">Spending</div><div class="d" id="pcSpendSub"></div></div><div class="v" id="pcSpend"></div></div>
     <div class="row"><div class="l"><div class="t">Savings</div><div class="d" id="pcSaveSub"></div></div><div class="v" id="pcSave"></div></div>
-    <div class="row"><div class="l"><div class="t">Salary received this cycle</div><div class="d" id="pcSalSub"></div></div><div class="sw" id="pcSal" onclick="toggleSalary()"></div></div>
+    <div class="row"><div class="l"><div class="t" id="pcSalT">Salary received this cycle</div><div class="d" id="pcSalSub"></div></div><div class="sw" id="pcSal" onclick="toggleSalary()"></div></div>
+    <div class="row" id="pcNextRow" style="display:none"><div class="l"><div class="t">Next salary landed early?</div><div class="d">tap to start the next cycle from today</div></div><button class="link" onclick="salaryEarly()">Start next cycle</button></div>
   </div>
 
   <div class="sec" id="tmTitle">This cycle</div>
@@ -167,7 +168,7 @@
   <div class="card"><div class="chart"><canvas id="cLog"></canvas></div></div>
   <div class="sec">Settings</div>
   <div class="card">
-    <div class="row"><div class="l"><div class="t">Salary day of month</div><div class="d">the cycle runs from this day to the day before the next salary</div></div><div class="v"><input type="number" inputmode="numeric" id="sSalaryDay" onchange="saveSalaryDay()"></div></div>
+    <div class="row"><div class="l"><div class="t">Salary day of month</div><div class="d">cycles run from this day to the day before the next one; if a salary lands early, switch it on that day and the cycle starts there</div></div><div class="v"><input type="number" inputmode="numeric" id="sSalaryDay" onchange="saveSalaryDay()"></div></div>
     <div class="row"><div class="l"><div class="t">Monthly salary</div><div class="d">from This Month!A39</div></div><div class="v" id="sSalary"></div></div>
   </div>
   <button class="btn sec2" id="btnClose" onclick="closeMonth()">Close this cycle (save a snapshot)</button>
@@ -204,10 +205,10 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '17';
+const APP_VERSION = '18';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
-let D = null, charts = {}, editRow = null;
+let D = null, charts = {}, editRow = null, confirmEarly = false;
 const SAR = v => (v === null || v === undefined || isNaN(v)) ? '—' : (v < 0 ? '−' : '') + 'SAR ' + Math.abs(v).toLocaleString('en-US', {maximumFractionDigits: 0});
 const $ = id => document.getElementById(id);
 const dark = () => matchMedia('(prefers-color-scheme: dark)').matches;
@@ -247,7 +248,8 @@ function render(){
   $('pcSpendSub').textContent = 'current + credit + cash '+SAR(d.spendable)+' · plan says '+SAR(d.expectedSpendable)+(d.hasOpening?'':' (opening not frozen yet — switch on the salary when it lands)');
   const pv=$('pcSave'); pv.textContent = sg(d.savingsDelta); pv.className='v '+(d.savingsDelta>=-1?'pos':'neg');
   $('pcSaveSub').textContent = d.savingsDelta < -1 ? 'move '+SAR(-d.savingsDelta)+' to savings · account '+SAR(d.savings)+' vs plan '+SAR(d.cumTarget) : 'savings account '+SAR(d.savings)+' · plan '+SAR(d.cumTarget);
-  $('pcSal').classList.toggle('on', !!d.salaryReceived); $('pcSalSub').textContent = ({'auto':'detected from your balance','manual-yes':'set by you','manual-no':'set by you: not yet','none':'not seen yet · switch on when it lands'})[d.salaryMode] || '';
+  $('pcSal').classList.toggle('on', !!d.salaryReceived); $('pcSalSub').textContent = (({'auto':'detected from your balance','manual-yes':'set by you','manual-no':'set by you: not yet','none':'not seen yet · switch on when it lands'})[d.salaryMode] || '') + (d.cycle.early ? ' · cycle started early on '+fmtAdd(d.cycle.start) : '');
+  $('pcNextRow').style.display = (d.hasOpening && d.cycle.left <= 10) ? 'flex' : 'none';
   // this cycle
   $('tmTitle').textContent = 'This cycle · '+d.cycle.label;
   $('tmOpen').textContent = SAR(d.opening); $('tmOpenSub').textContent = d.hasOpening ? 'spendable money the day the salary landed' : (d.salaryReceived?'spendable now':'spendable now + salary to come');
@@ -330,7 +332,8 @@ let armed={};
 function arm(id,label,fn){ const b=$(id); if(armed[id]){ clearTimeout(armed[id]); armed[id]=null; b.textContent=label; fn(); return; } b.textContent='Tap again to confirm'; armed[id]=setTimeout(()=>{armed[id]=null;b.textContent=label;},3000); }
 function deleteEdit(){ arm('eDelete','Delete item',()=>{ busy(true); call('deleteExpense',editRow).then(d=>{busy(false);set(d);go('items');toast('Deleted');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }); }
 function saveLoan(){ busy(true); const m=$('lMonth').value; call('updateLoan',{price:num($('lPrice').value),loan:num($('lLoan').value),rate:num($('lRate').value),years:num($('lYears').value),fees:num($('lFees').value),growth:num($('lGrowth').value),floor:num($('lFloor').value),month:m?m+'-01':null}).then(d=>{busy(false);set(d);toast('Scenario updated');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
-function toggleSalary(){ const on=!D.salaryReceived; $('pcSal').classList.toggle('on',on); call('setSetting','salaryReceived:'+D.monthKey, on?'true':'false').then(d=>{set(d);toast(on?'Salary counted':'Salary not counted');}).catch(e=>toast('Error: '+e.message)); }
+function toggleSalary(){ const on=!D.salaryReceived; if(on && D.hasOpening){ return salaryEarly(); } $('pcSal').classList.toggle('on',on); call('salaryLanded', on).then(d=>{set(d);toast(on?'Salary counted · opening balance frozen':'Salary not counted');}).catch(e=>toast('Error: '+e.message)); }
+function salaryEarly(){ if(!confirmEarly){ confirmEarly=true; toast('Tap again to start the next cycle from today'); setTimeout(()=>confirmEarly=false,3000); return; } confirmEarly=false; call('salaryLanded', true).then(d=>{set(d);toast('New cycle started today');}).catch(e=>toast('Error: '+e.message)); }
 function saveSalaryDay(){ call('setSetting','salaryDay',num($('sSalaryDay').value)).then(d=>{set(d);toast('Saved');}); }
 function closeMonth(){ arm('btnClose','Close this cycle (save a snapshot)',()=>{ call('monthlyClose').then(d=>{set(d);toast('Cycle closed');}); }); }
 load();

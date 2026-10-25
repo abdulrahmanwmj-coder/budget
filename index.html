@@ -89,23 +89,20 @@
 
   <div class="sec">Plan check</div>
   <div class="card">
-    <div class="row"><div class="l"><div class="t">You should have today</div><div class="d" id="pcBase"></div></div><div class="v" id="pcExpected"></div></div>
-    <div class="row"><div class="l"><div class="t">Ahead / behind plan</div><div class="d">actual minus expected</div></div><div class="v" id="pcDelta"></div></div>
-    <div class="row"><div class="l"><div class="t">Expected end of month</div></div><div class="v" id="pcEnd"></div></div>
-    <div class="row"><div class="l"><div class="t">Salary received this month</div><div class="d" id="pcSalSub"></div></div><div class="sw" id="pcSal" onclick="toggleSalary()"></div></div>
+    <div class="row"><div class="l"><div class="t">Spending</div><div class="d" id="pcSpendSub"></div></div><div class="v" id="pcSpend"></div></div>
+    <div class="row"><div class="l"><div class="t">Savings</div><div class="d" id="pcSaveSub"></div></div><div class="v" id="pcSave"></div></div>
+    <div class="row"><div class="l"><div class="t">Salary received this cycle</div><div class="d" id="pcSalSub"></div></div><div class="sw" id="pcSal" onclick="toggleSalary()"></div></div>
   </div>
 
-  <div class="sec">This month</div>
+  <div class="sec" id="tmTitle">This cycle</div>
   <div class="card">
-    <div class="row"><div class="l"><div class="t">Planned spending</div></div><div class="v" id="tmPlanned"></div></div>
+    <div class="row"><div class="l"><div class="t">Opening balance</div><div class="d" id="tmOpenSub"></div></div><div class="v" id="tmOpen"></div></div>
+    <div class="row"><div class="l"><div class="t">Expenses this cycle</div><div class="d" id="tmBig"></div></div><div class="v" id="tmPlanned"></div></div>
+    <div class="row"><div class="l"><div class="t">Savings this cycle</div><div class="d" id="tmSaveSub"></div></div><div class="v blue" id="tmSave"></div></div>
     <div class="row"><div class="l"><div class="t">Should be spent by now</div><div class="d" id="tmDays"></div></div><div class="v" id="tmSpent"></div></div>
     <div class="row"><div class="l"><div class="t">Still to spend</div></div><div class="v" id="tmRemaining"></div></div>
-    <div class="row"><div class="l"><div class="t">Per day for the rest of the month</div></div><div class="v" id="tmDaily"></div></div>
-  </div>
-
-  <div class="sec">Salary plan</div>
-  <div class="card">
-    <div class="row"><div class="l"><div class="t" id="spMoveT">Safe to move to savings now</div><div class="d" id="spRegular"></div></div><div class="v blue" id="spMove"></div></div>
+    <div class="row"><div class="l"><div class="t">Per day for the rest of the cycle</div></div><div class="v" id="tmDaily"></div></div>
+    <div class="row"><div class="l"><div class="t">Closing balance</div><div class="d">what will be left on the last day — move it to savings then</div></div><div class="v" id="tmClose"></div></div>
   </div>
 
   <div class="sec">Coming up</div>
@@ -116,8 +113,8 @@
 <div class="page" id="p-items">
   <h1>Items</h1>
   <div class="sub" id="itemsSub"></div>
-  <div class="sec">Due this month — switch = paid</div>
-  <div class="mini" style="margin:-4px 16px 8px">Monthly bills are assumed paid; switch one off if it isn't yet. Big items start unpaid.</div>
+  <div class="sec">Due this cycle — switch = paid</div>
+  <div class="mini" style="margin:-4px 16px 8px">Monthly bills are assumed paid at the start of the cycle; switch one off if it isn't yet. Big items start unpaid.</div>
   <div class="card" id="itemsMonth"></div>
   <div class="sec">All items</div>
   <div class="card" id="itemsAll"></div>
@@ -134,8 +131,8 @@
     <div class="row"><div class="l"><div class="t">How often</div></div><div class="v"><select id="eFreq" onchange="editHint()">
       <option>Daily</option><option>Weekly</option><option selected>Monthly</option><option>Quarterly</option><option>Annually</option><option>Annually (Hijri)</option><option>One Time</option></select></div></div>
     <div class="row" id="eDateRow"><div class="l"><div class="t" id="eDateLabel">Date</div><div class="d" id="eDateHint"></div></div><div class="v"><input type="date" id="eDate"><input id="eHijri" placeholder="18/11" style="display:none"></div></div>
-    <div class="row"><div class="l"><div class="t">Stop after (optional)</div><div class="d">last month this is paid</div></div><div class="v"><input type="date" id="eStop"></div></div>
-    <div class="row" id="eSpreadRow"><div class="l"><div class="t">Spread over the month</div><div class="d">counts per day, like groceries (fuel, clothes, toys…)</div></div><div class="sw" id="eSpread" onclick="toggleSpread()"></div></div>
+    <div class="row"><div class="l"><div class="t">Stop after (optional)</div><div class="d">last date this is paid</div></div><div class="v"><input type="date" id="eStop"></div></div>
+    <div class="row" id="eSpreadRow"><div class="l"><div class="t">Spread over the cycle</div><div class="d">counts per day, like groceries (fuel, clothes, toys…)</div></div><div class="sw" id="eSpread" onclick="toggleSpread()"></div></div>
   </div>
   <button class="btn" onclick="saveEdit()">Save</button>
   <button class="btn danger" id="eDelete" onclick="deleteEdit()">Delete item</button>
@@ -145,38 +142,35 @@
 <!-- FORECAST -->
 <div class="page" id="p-forecast">
   <h1>Forecast</h1>
-  <div class="sub">From the Total Plan sheet, month by month.</div>
-  <div class="sec">Balance if the plan holds</div>
+  <div class="sub">Salary cycle by salary cycle, from the Total Plan sheet.</div>
+  <div class="sec">Cumulative savings if the plan holds</div>
   <div class="card"><div class="chart"><canvas id="cBalance"></canvas></div></div>
-  <div class="sec">Spending per month</div>
+  <div class="sec">Expenses per cycle</div>
   <div class="card"><div class="chart"><canvas id="cExpenses"></canvas></div></div>
-  <div class="sec">Next 12 months — balance at the end of each</div>
+  <div class="sec">Next 12 cycles — opening · expenses · savings → cumulative</div>
   <div class="card" id="futureList"></div>
 </div>
 
 <!-- SAVINGS -->
 <div class="page" id="p-savings">
   <h1>Savings</h1>
-  <div class="sub">One number to act on; the rest is planning context.</div>
+  <div class="sub">Savings account versus the plan.</div>
   <div class="card">
-    <div class="row"><div class="l"><div class="t">Safe to move now</div><div class="d" id="svMoveD"></div></div><div class="v blue" id="svMove"></div></div>
+    <div class="row"><div class="l"><div class="t">Savings this cycle</div><div class="d" id="svPlanSub"></div></div><div class="v blue" id="svPlan"></div></div>
+    <div class="row"><div class="l"><div class="t">Savings account should hold</div><div class="d">cumulative savings for this cycle</div></div><div class="v" id="svTarget"></div></div>
+    <div class="row"><div class="l"><div class="t">Savings account now</div></div><div class="v" id="svNow"></div></div>
+    <div class="row"><div class="l"><div class="t">Ahead / behind</div><div class="d" id="svDeltaSub"></div></div><div class="v" id="svDelta"></div></div>
   </div>
-  <div class="sec">Where savings could be, month by month</div>
-  <div class="card">
-    <div class="row"><div class="l"><div class="t">Min saving by end of next month</div><div class="d">cumulative — keeps the month after fully covered in current</div></div><div class="v" id="svMin"></div></div>
-    <div class="row"><div class="l"><div class="t">Max saving by end of next month</div><div class="d">cumulative — if big items are paid out of savings when due</div></div><div class="v" id="svMax"></div></div>
-    <div class="row"><div class="l"><div class="t">Left over from next month's salary</div><div class="d">salary minus everything due next month; negative = covered by earlier months</div></div><div class="v" id="svLeft"></div></div>
-  </div>
-  <div class="sec">Savings you could hold — min vs max (cumulative)</div>
+  <div class="sec">Cumulative savings plan</div>
   <div class="card"><div class="chart"><canvas id="cSave"></canvas></div></div>
-  <div class="sec">Your balance vs the plan</div>
+  <div class="sec">Spending accounts vs the plan</div>
   <div class="card"><div class="chart"><canvas id="cLog"></canvas></div></div>
   <div class="sec">Settings</div>
   <div class="card">
-    <div class="row"><div class="l"><div class="t">Salary day of month</div><div class="d">used for the plan check</div></div><div class="v"><input type="number" inputmode="numeric" id="sSalaryDay" onchange="saveSalaryDay()"></div></div>
+    <div class="row"><div class="l"><div class="t">Salary day of month</div><div class="d">the cycle runs from this day to the day before the next salary</div></div><div class="v"><input type="number" inputmode="numeric" id="sSalaryDay" onchange="saveSalaryDay()"></div></div>
     <div class="row"><div class="l"><div class="t">Monthly salary</div><div class="d">from This Month!A39</div></div><div class="v" id="sSalary"></div></div>
   </div>
-  <button class="btn sec2" id="btnClose" onclick="closeMonth()">Close this month (save a snapshot)</button>
+  <button class="btn sec2" id="btnClose" onclick="closeMonth()">Close this cycle (save a snapshot)</button>
 </div>
 
 <!-- LOAN -->
@@ -210,7 +204,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '16';
+const APP_VERSION = '17';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null;
@@ -237,15 +231,6 @@ document.addEventListener('touchstart',e=>{ ptrY = (window.scrollY<=0) ? e.touch
 document.addEventListener('touchmove',e=>{ if(ptrY===null) return; const dy=e.touches[0].clientY-ptrY; ptrArmed = dy>80; $('ptr').classList.toggle('on', dy>30); },{passive:true});
 document.addEventListener('touchend',()=>{ $('ptr').classList.remove('on'); if(ptrArmed) refresh(); ptrY=null; ptrArmed=false; });
 function set(d){ D=d; $('loading').style.display='none'; render(); }
-// Safe transfer = spendable money (current + credit + cash, plus salary if it has not landed yet) minus the rest of this month minus all of next month
-function safeMove(d){
-  const spendable = num(d.current)+num(d.card)+num(d.cash) + (d.salaryReceived?0:num(d.salary));
-  const nm = d.future && d.future[0] ? d.future[0] : {total:0,lines:[],label:'next month'};
-  const big = (nm.lines||[]).filter(l=>['Daily','Weekly','Monthly'].indexOf(l.freq)<0).map(l=>l.item+' '+Math.round(l.amount).toLocaleString()).join(', ');
-  const amount = d.safeMove !== undefined ? num(d.safeMove) : Math.max(0, spendable - num(d.remaining) - num(nm.total));
-  const why = 'keeps '+SAR(d.remaining)+' for the rest of this month + '+SAR(nm.total)+' for '+nm.label+(big?' (incl. '+big+')':'');
-  return {amount, why, spendable};
-}
 let showTotal = false; try{ showTotal = sessionStorage.getItem('budgetShowTotal')==='1'; }catch(e){}
 function drawTotal(){ $('tTotal').textContent = showTotal ? SAR(D.total) : 'SAR ••••••'; $('tTotal').style.color = showTotal ? '' : 'var(--sub)'; }
 function toggleTotal(){ showTotal=!showTotal; try{ sessionStorage.setItem('budgetShowTotal', showTotal?'1':'0'); }catch(e){} drawTotal(); }
@@ -256,27 +241,29 @@ function render(){
   drawTotal();
   $('tHero').textContent = 'current ' + SAR(d.current) + ' · saving ' + SAR(d.savings) + ' · credit ' + SAR(d.card||0) + ' · cash ' + SAR(d.cash||0);
   $('inCurrent').value = d.current; $('inSavings').value = d.savings; $('inCard').value = d.card||0; $('inCash').value = d.cash||0;
-  // plan check
-  if (d.delta === null) { $('pcExpected').textContent='—'; $('pcDelta').textContent='Set a starting point'; $('pcDelta').className='v mini'; $('pcBase').textContent='Update your balances once to start tracking'; $('pcEnd').textContent=SAR(d.expectedEnd); }
-  else {
-    $('pcExpected').textContent = SAR(d.expectedToday);
-    const bd=new Date(d.baseline.date); $('pcBase').textContent=SAR(d.baseline.total)+' on '+bd.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' − '+SAR(d.spentSince)+' planned spend since';
-    const e=$('pcDelta'); e.textContent=(d.delta>=0?'+':'')+SAR(d.delta); e.className='v '+(d.delta>=0?'pos':'neg');
-    $('pcEnd').textContent = SAR(d.expectedEnd);
-  }
+  // plan check — spending accounts vs plan, savings account vs plan
+  const sg = (v) => (v>=0?'+':'')+SAR(v);
+  const ps=$('pcSpend'); ps.textContent = sg(d.spendDelta); ps.className='v '+(d.spendDelta>=0?'pos':'neg');
+  $('pcSpendSub').textContent = 'current + credit + cash '+SAR(d.spendable)+' · plan says '+SAR(d.expectedSpendable)+(d.hasOpening?'':' (opening not frozen yet — switch on the salary when it lands)');
+  const pv=$('pcSave'); pv.textContent = sg(d.savingsDelta); pv.className='v '+(d.savingsDelta>=-1?'pos':'neg');
+  $('pcSaveSub').textContent = d.savingsDelta < -1 ? 'move '+SAR(-d.savingsDelta)+' to savings · account '+SAR(d.savings)+' vs plan '+SAR(d.cumTarget) : 'savings account '+SAR(d.savings)+' · plan '+SAR(d.cumTarget);
   $('pcSal').classList.toggle('on', !!d.salaryReceived); $('pcSalSub').textContent = ({'auto':'detected from your balance','manual-yes':'set by you','manual-no':'set by you: not yet','none':'not seen yet · switch on when it lands'})[d.salaryMode] || '';
-  $('tmPlanned').textContent=SAR(d.planned); $('tmSpent').textContent=SAR(d.spentPlan); $('tmRemaining').textContent=SAR(d.remaining); $('tmDaily').textContent=SAR(d.dailyLeft);
-  $('tmDays').textContent = d.elapsed+' of '+d.daysInMonth+' days gone · '+d.left+' left';
-  const sm = safeMove(d);
-  $('spMoveT').textContent = d.salaryReceived ? 'Safe to move to savings now' : 'Safe to move once salary lands';
-  $('spMove').textContent=SAR(sm.amount); $('spRegular').textContent=sm.why; 
-  // upcoming: unpaid fixed items this month + next 2 months' big lines
+  // this cycle
+  $('tmTitle').textContent = 'This cycle · '+d.cycle.label;
+  $('tmOpen').textContent = SAR(d.opening); $('tmOpenSub').textContent = d.hasOpening ? 'spendable money the day the salary landed' : (d.salaryReceived?'spendable now':'spendable now + salary to come');
+  $('tmPlanned').textContent=SAR(d.planned);
+  const bigNow = d.thisMonth.filter(x=>x.big).map(x=>x.item+' ('+Math.round(x.due).toLocaleString()+')').join(', '); $('tmBig').textContent = bigNow ? 'incl. '+bigNow : 'regular only';
+  $('tmSave').textContent = SAR(d.savingsPlan); $('tmSaveSub').textContent = d.savingsPlan>=0 ? 'opening − expenses · move it to savings on salary day' : 'opening − expenses · pull this back from savings';
+  $('tmSpent').textContent=SAR(d.spentPlan); $('tmRemaining').textContent=SAR(d.remaining); $('tmDaily').textContent=SAR(d.dailyLeft);
+  $('tmDays').textContent = d.cycle.elapsed+' of '+d.cycle.days+' days gone · '+d.cycle.left+' left';
+  $('tmClose').textContent = SAR(d.closing);
+  // upcoming: unpaid big items this cycle + next 2 cycles' big lines
   let up='';
-  d.thisMonth.filter(x=>x.big && !x.paid).forEach(x=> up+=rowHtml(x.item,'this month · '+x.freq+' · not paid yet', SAR(x.due)));
-  d.future.slice(0,2).forEach(m=> m.lines.filter(l=>['Daily','Weekly','Monthly'].indexOf(l.freq)<0).forEach(l=> up+=rowHtml(l.item, m.label+' · '+l.freq, SAR(l.amount))));
+  d.thisMonth.filter(x=>x.big && !x.paid).forEach(x=> up+=rowHtml(x.item,'this cycle · '+x.freq+' · not paid yet', SAR(x.due)));
+  d.future.slice(0,2).forEach(m=> m.lines.filter(l=>['Daily','Weekly','Monthly'].indexOf(l.freq)<0).forEach(l=> up+=rowHtml(l.item, m.window+' · '+l.freq, SAR(l.amount))));
   $('upcoming').innerHTML = up || rowHtml('Nothing big coming up','','');
   // items
-  $('itemsSub').textContent = d.monthLabel+' · planned '+SAR(d.planned)+' · remaining '+SAR(d.remaining);
+  $('itemsSub').textContent = d.cycle.label+' · planned '+SAR(d.planned)+' · remaining '+SAR(d.remaining);
   let im='';
   d.thisMonth.forEach(x=>{
     const pct = x.due? Math.round(100*(x.due-x.remaining)/x.due):0;
@@ -285,22 +272,24 @@ function render(){
     const bar = x.fixed ? '' : '<div class="bar"><i style="width:'+pct+'%"></i></div>';
     im += '<div class="row"><div class="l"><div class="t">'+x.item+(x.fixed?' <span class="v mini">'+SAR(x.due)+'</span>':'')+'</div><div class="d">'+sub+'</div>'+bar+'</div>'+ctl+'</div>';
   });
-  $('itemsMonth').innerHTML = im || rowHtml('Nothing due this month','','');
+  $('itemsMonth').innerHTML = im || rowHtml('Nothing due this cycle','','');
   let ia='';
   d.items.forEach(it=> ia += '<div class="row" onclick="openEdit('+it.row+')"><div class="l"><div class="t">'+it.item+'</div><div class="d">'+it.freq+(it.add?' · '+fmtAdd(it.add):'')+(it.stop?' · stops '+fmtAdd(it.stop):'')+'</div></div><div class="v">'+SAR(it.amount)+' <span class="mini">›</span></div></div>');
   $('itemsAll').innerHTML = ia;
   // future list
   let fl='';
-  const balByKey = {}; d.forecast.forEach(x=>balByKey[x.key]=x.balance);
+  const fcByKey = {}; d.forecast.forEach(x=>fcByKey[x.key]=x);
   d.future.forEach(m=>{
     const big = m.lines.filter(l=>['Daily','Weekly','Monthly'].indexOf(l.freq)<0).map(l=>l.item+' ('+Math.round(l.amount).toLocaleString()+')').join(', ');
-    const bal = balByKey[m.key];
-    fl += '<details><summary class="row"><div class="l"><div class="t">'+m.label+'</div><div class="d">spend '+SAR(m.total)+(big?' · '+big:'')+'</div></div><div class="v"><div class="'+(bal<0?'neg':'blue')+'">'+SAR(bal)+'</div><div class="mini" style="text-align:right">end of month</div></div></summary>' + m.lines.map(l=>'<div class="row" style="padding-left:32px"><div class="l"><div class="t mini">'+l.item+'</div></div><div class="v mini">'+SAR(l.amount)+'</div></div>').join('') + '</details>';
+    const fc = fcByKey[m.key] || {};
+    const sv = fc.savings;
+    fl += '<details><summary class="row"><div class="l"><div class="t">'+m.label+' <span class="mini">'+m.window+'</span></div><div class="d">opening '+SAR(fc.opening)+' − expenses '+SAR(m.total)+' = <span class="'+(sv<0?'neg':'pos')+'">'+(sv>=0?'+':'')+SAR(sv)+'</span>'+(big?' · '+big:'')+'</div></div><div class="v"><div class="blue">'+SAR(fc.cumulative)+'</div><div class="mini" style="text-align:right">cumulative</div></div></summary>' + m.lines.map(l=>'<div class="row" style="padding-left:32px"><div class="l"><div class="t mini">'+l.item+'</div></div><div class="v mini">'+SAR(l.amount)+'</div></div>').join('') + '</details>';
   });
   $('futureList').innerHTML = fl;
   // savings
-  const f0 = d.forecast[1] || d.forecast[0] || {};
-  $('svMin').textContent=SAR(f0.minSave); $('svMax').textContent=SAR(f0.maxSave); const sm2=safeMove(d); $('svMove').textContent=SAR(sm2.amount); $('svMoveD').textContent=sm2.why; $('svLeft').textContent=SAR(f0.leftover); $('svLeft').className='v '+((f0.leftover||0)<0?'neg':'');
+  $('svPlan').textContent=SAR(d.savingsPlan); $('svPlanSub').textContent='opening '+SAR(d.opening)+' − expenses '+SAR(d.planned);
+  $('svTarget').textContent=SAR(d.cumTarget); $('svNow').textContent=SAR(d.savings);
+  const sd=$('svDelta'); sd.textContent=sg(d.savingsDelta); sd.className='v '+(d.savingsDelta>=-1?'pos':'neg'); $('svDeltaSub').textContent = d.savingsDelta < -1 ? 'move '+SAR(-d.savingsDelta)+' to savings' : 'on plan';
   $('sSalaryDay').value=d.salaryDay; $('sSalary').textContent=SAR(d.salary);
   // loan
   const L = {}; d.loan.forEach(r=>L[r.label]=r.value);
@@ -322,8 +311,8 @@ function fmtAdd(v){ if(/^\d{4}-\d{2}-\d{2}/.test(v)){ const p=v.slice(0,10).spli
 
 // ---- charts ----
 function mk(id, cfg){ if(charts[id]) charts[id].destroy(); const base = {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:cfg.data.datasets.length>1,labels:{boxWidth:10,font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}; cfg.options=Object.assign(base,cfg.options||{}); charts[id]=new Chart($(id),cfg); }
-function drawForecast(){ const f=D.forecast; mk('cBalance',{type:'line',data:{labels:f.map(x=>x.label),datasets:[{data:f.map(x=>x.balance),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,fill:{target:'origin',above:'rgba(0,122,255,.08)'}}]}}); mk('cExpenses',{type:'bar',data:{labels:f.slice(0,24).map(x=>x.label),datasets:[{data:f.slice(0,24).map(x=>x.expenses),backgroundColor:f.slice(0,24).map(x=>x.big?'#FF9500':'#007AFF'),borderRadius:3}]}}); }
-function drawSavings(){ const f=D.forecast.slice(0,24); mk('cSave',{type:'line',data:{labels:f.map(x=>x.label),datasets:[{label:'Min',data:f.map(x=>x.minSave),borderColor:'#8e8e93',borderWidth:2,pointRadius:0,tension:.25},{label:'Max',data:f.map(x=>x.maxSave),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25}]}}); const l=D.log; if(!l.length){ if(charts.cLog){charts.cLog.destroy();delete charts.cLog;} const c=$('cLog').getContext('2d'); c.clearRect(0,0,$('cLog').width,$('cLog').height); $('cLog').parentElement.setAttribute('data-empty','1'); } else { $('cLog').parentElement.removeAttribute('data-empty'); mk('cLog',{type:'line',data:{labels:l.map(x=>new Date(x.t).toLocaleDateString('en-GB',{day:'numeric',month:'short'})),datasets:[{label:'Actual',data:l.map(x=>x.total),borderColor:'#007AFF',borderWidth:2,pointRadius:2,tension:.2},{label:'Expected',data:l.map(x=>x.expected),borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:.2}]}}); } }
+function drawForecast(){ const f=D.forecast; mk('cBalance',{type:'line',data:{labels:f.map(x=>x.label),datasets:[{data:f.map(x=>x.cumulative),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,fill:{target:'origin',above:'rgba(0,122,255,.08)'}}]}}); mk('cExpenses',{type:'bar',data:{labels:f.slice(0,24).map(x=>x.label),datasets:[{data:f.slice(0,24).map(x=>x.expenses),backgroundColor:f.slice(0,24).map(x=>x.big?'#FF9500':'#007AFF'),borderRadius:3}]}}); }
+function drawSavings(){ const f=D.forecast.slice(0,24); mk('cSave',{type:'bar',data:{labels:f.map(x=>x.label),datasets:[{label:'Savings each cycle',data:f.map(x=>x.savings),backgroundColor:f.map(x=>x.savings<0?'#FF3B30':'#8e8e93'),borderRadius:3,order:2},{label:'Cumulative',type:'line',data:f.map(x=>x.cumulative),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,order:1}]}}); const l=D.log; if(!l.length){ if(charts.cLog){charts.cLog.destroy();delete charts.cLog;} const c=$('cLog').getContext('2d'); c.clearRect(0,0,$('cLog').width,$('cLog').height); $('cLog').parentElement.setAttribute('data-empty','1'); } else { $('cLog').parentElement.removeAttribute('data-empty'); mk('cLog',{type:'line',data:{labels:l.map(x=>new Date(x.t).toLocaleDateString('en-GB',{day:'numeric',month:'short'})),datasets:[{label:'Current + credit + cash',data:l.map(x=>x.current+x.card+x.cash),borderColor:'#007AFF',borderWidth:2,pointRadius:2,tension:.2},{label:'Plan',data:l.map(x=>x.expected),borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:.2}]}}); } }
 function drawLoan(){ const s=D.loanSeries; mk('cLoan',{type:'line',data:{labels:s.map(x=>x.label),datasets:[{label:'Keep renting',data:s.map(x=>x.rent),borderColor:'#8e8e93',borderWidth:2,pointRadius:0,tension:.2},{label:'Buy (cash + home − loan)',data:s.map(x=>x.wealth),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.2}]}}); }
 
 // ---- actions ----
@@ -343,7 +332,7 @@ function deleteEdit(){ arm('eDelete','Delete item',()=>{ busy(true); call('delet
 function saveLoan(){ busy(true); const m=$('lMonth').value; call('updateLoan',{price:num($('lPrice').value),loan:num($('lLoan').value),rate:num($('lRate').value),years:num($('lYears').value),fees:num($('lFees').value),growth:num($('lGrowth').value),floor:num($('lFloor').value),month:m?m+'-01':null}).then(d=>{busy(false);set(d);toast('Scenario updated');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
 function toggleSalary(){ const on=!D.salaryReceived; $('pcSal').classList.toggle('on',on); call('setSetting','salaryReceived:'+D.monthKey, on?'true':'false').then(d=>{set(d);toast(on?'Salary counted':'Salary not counted');}).catch(e=>toast('Error: '+e.message)); }
 function saveSalaryDay(){ call('setSetting','salaryDay',num($('sSalaryDay').value)).then(d=>{set(d);toast('Saved');}); }
-function closeMonth(){ arm('btnClose','Close this month (save a snapshot)',()=>{ call('monthlyClose').then(d=>{set(d);toast('Month closed');}); }); }
+function closeMonth(){ arm('btnClose','Close this cycle (save a snapshot)',()=>{ call('monthlyClose').then(d=>{set(d);toast('Cycle closed');}); }); }
 load();
 </script>
 </body>

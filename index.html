@@ -205,7 +205,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '23';
+const APP_VERSION = '24';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -329,11 +329,13 @@ function busy(b){ document.querySelectorAll('.btn').forEach(x=>x.disabled=b); }
 function saveBalances(){ const c=num($('inCurrent').value), sv=num($('inSavings').value), cd=num($('inCard').value), ch=num($('inCash').value);
   const dc=c-D.current, dsv=sv-D.savings, dcd=cd-D.card, dch=ch-D.cash;
   D.current=c; D.savings=sv; D.card=cd; D.cash=ch; D.spendable+=dc+dcd+dch; D.total+=dc+dsv+dcd+dch; D.spendDelta+=dc+dcd+dch; D.savingsDelta+=dsv; D.moved+=dsv; D.expectedSpendable-=dsv; D.closing+=dc+dcd+dch;
-  render(); syncing(true); toast('Saving…');
-  call('updateBalances', c, sv, cd, ch).then(d=>{syncing(false); if(pending===0) set(d); toast('Balances saved');}).catch(e=>{syncing(false);toast('Not saved: '+e.message); load();}); }
+  render(); syncing(true); toast('Saving…'); const my=++reqSeq;
+  call('updateBalances', c, sv, cd, ch).then(d=>{settle(my,d); toast('Balances saved');}).catch(e=>{syncing(false);toast('Not saved: '+e.message); load();}); }
 // Optimistic: apply the tick on screen right away, then let the server's answer replace it.
-let pending = 0;
+let pending = 0, reqSeq = 0, lastSeen = 0, outOfOrder = false;
 function syncing(on){ pending += on?1:-1; $('btnRefresh').classList.toggle('spin', pending>0); }
+// only the answer to the newest request is applied; if answers came back out of order, re-read from the server afterwards
+function settle(my, d){ syncing(false); if(my<lastSeen) outOfOrder=true; lastSeen=Math.max(lastSeen,my); if(my===reqSeq){ if(outOfOrder){ outOfOrder=false; call('getData').then(set).catch(()=>{}); } else set(d); } }
 function togglePaid(item,paid){
   const it=D.thisMonth.find(x=>x.item===item); if(!it) return;
   const was=it.paid; const due=it.due;
@@ -341,8 +343,8 @@ function togglePaid(item,paid){
   D.remaining += paid?-due:due; D.spentPlan += paid?due:-due;
   if(paid && !was){ D.current-=due; D.spendable-=due; D.expectedSpendable-=due; }
   if(!paid && was && !it.defPaidUntouched){ D.current+=due; D.spendable+=due; D.expectedSpendable+=due; }
-  render(); syncing(true);
-  call('setPaid',item,paid).then(d=>{ syncing(false); if(pending===0) set(d); }).catch(e=>{ syncing(false); toast('Not saved: '+e.message); load(); });
+  render(); syncing(true); const my=++reqSeq;
+  call('setPaid',item,paid).then(d=>settle(my,d)).catch(e=>{ syncing(false); toast('Not saved: '+e.message); load(); });
 }
 function openEdit(row){ editRow=row; const it = row? D.items.find(x=>x.row===row):null; $('editTitle').textContent = it?'Edit item':'Add item'; $('eDelete').style.display = it?'block':'none';
   $('eName').value=it?it.item:''; $('eAmount').value=it?it.amount:''; $('eFreq').value=it?it.freq:'Monthly';

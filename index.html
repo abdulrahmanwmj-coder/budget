@@ -160,8 +160,9 @@
   <h1>Savings</h1>
   <div class="sub">Where the money should go each salary.</div>
   <div class="card">
-    <div class="row"><div class="l"><div class="t">Big items, averaged per month</div><div class="d">what every salary really needs to cover</div></div><div class="v" id="svMin"></div></div>
-    <div class="row"><div class="l"><div class="t">Left over from next month's salary</div><div class="d">salary minus everything due that month</div></div><div class="v" id="svMax"></div></div>
+    <div class="row"><div class="l"><div class="t">Min saving</div><div class="d">big items averaged per month — what every salary really needs to cover</div></div><div class="v" id="svMin"></div></div>
+    <div class="row"><div class="l"><div class="t">Max saving</div><div class="d">salary minus regular living (next month)</div></div><div class="v" id="svMax"></div></div>
+    <div class="row"><div class="l"><div class="t">Left over from next month's salary</div><div class="d">salary minus everything due that month; negative = funded from earlier months</div></div><div class="v" id="svLeft"></div></div>
     <div class="row"><div class="l"><div class="t">Safe to move now</div><div class="d" id="svMoveD"></div></div><div class="v blue" id="svMove"></div></div>
   </div>
   <div class="sec">Min vs max per month</div>
@@ -207,7 +208,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '13';
+const APP_VERSION = '14';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null;
@@ -297,7 +298,7 @@ function render(){
   $('futureList').innerHTML = fl;
   // savings
   const f0 = d.forecast[1] || d.forecast[0] || {};
-  $('svMin').textContent=SAR(f0.minSave); $('svMax').textContent=SAR(f0.maxSave); const sm2=safeMove(d); $('svMove').textContent=SAR(sm2.amount); $('svMoveD').textContent=sm2.why;
+  $('svMin').textContent=SAR(f0.minSave); $('svMax').textContent=SAR(f0.maxSave); const sm2=safeMove(d); $('svMove').textContent=SAR(sm2.amount); $('svMoveD').textContent=sm2.why; $('svLeft').textContent=SAR(f0.leftover); $('svLeft').className='v '+((f0.leftover||0)<0?'neg':'');
   $('sSalaryDay').value=d.salaryDay; $('sSalary').textContent=SAR(d.salary);
   // loan
   const L = {}; d.loan.forEach(r=>L[r.label]=r.value);

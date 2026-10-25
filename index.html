@@ -106,7 +106,6 @@
   <div class="sec">Salary plan</div>
   <div class="card">
     <div class="row"><div class="l"><div class="t" id="spMoveT">Safe to move to savings now</div><div class="d" id="spRegular"></div></div><div class="v blue" id="spMove"></div></div>
-    <div class="row"><div class="l"><div class="t">Big items, averaged per month</div><div class="d">rent, Morafiqeen, tuition, trips… this much of every salary is really spoken for</div></div><div class="v" id="spMin"></div></div>
   </div>
 
   <div class="sec">Coming up</div>
@@ -158,14 +157,17 @@
 <!-- SAVINGS -->
 <div class="page" id="p-savings">
   <h1>Savings</h1>
-  <div class="sub">Where the money should go each salary.</div>
+  <div class="sub">One number to act on; the rest is planning context.</div>
   <div class="card">
-    <div class="row"><div class="l"><div class="t">Min saving</div><div class="d">big items averaged per month — what every salary really needs to cover</div></div><div class="v" id="svMin"></div></div>
-    <div class="row"><div class="l"><div class="t">Max saving</div><div class="d">salary minus regular living (next month)</div></div><div class="v" id="svMax"></div></div>
-    <div class="row"><div class="l"><div class="t">Left over from next month's salary</div><div class="d">salary minus everything due that month; negative = funded from earlier months</div></div><div class="v" id="svLeft"></div></div>
     <div class="row"><div class="l"><div class="t">Safe to move now</div><div class="d" id="svMoveD"></div></div><div class="v blue" id="svMove"></div></div>
   </div>
-  <div class="sec">Min vs max per month</div>
+  <div class="sec">Where savings could be, month by month</div>
+  <div class="card">
+    <div class="row"><div class="l"><div class="t">Min saving by end of next month</div><div class="d">cumulative — keeps the month after fully covered in current</div></div><div class="v" id="svMin"></div></div>
+    <div class="row"><div class="l"><div class="t">Max saving by end of next month</div><div class="d">cumulative — if big items are paid out of savings when due</div></div><div class="v" id="svMax"></div></div>
+    <div class="row"><div class="l"><div class="t">Left over from next month's salary</div><div class="d">salary minus everything due next month; negative = covered by earlier months</div></div><div class="v" id="svLeft"></div></div>
+  </div>
+  <div class="sec">Savings you could hold — min vs max (cumulative)</div>
   <div class="card"><div class="chart"><canvas id="cSave"></canvas></div></div>
   <div class="sec">Your balance vs the plan</div>
   <div class="card"><div class="chart"><canvas id="cLog"></canvas></div></div>
@@ -208,7 +210,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '14';
+const APP_VERSION = '16';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null;
@@ -267,7 +269,7 @@ function render(){
   $('tmDays').textContent = d.elapsed+' of '+d.daysInMonth+' days gone · '+d.left+' left';
   const sm = safeMove(d);
   $('spMoveT').textContent = d.salaryReceived ? 'Safe to move to savings now' : 'Safe to move once salary lands';
-  $('spMove').textContent=SAR(sm.amount); $('spRegular').textContent=sm.why; $('spMin').textContent=SAR(d.minFund);
+  $('spMove').textContent=SAR(sm.amount); $('spRegular').textContent=sm.why; 
   // upcoming: unpaid fixed items this month + next 2 months' big lines
   let up='';
   d.thisMonth.filter(x=>x.big && !x.paid).forEach(x=> up+=rowHtml(x.item,'this month · '+x.freq+' · not paid yet', SAR(x.due)));
@@ -321,7 +323,7 @@ function fmtAdd(v){ if(/^\d{4}-\d{2}-\d{2}/.test(v)){ const p=v.slice(0,10).spli
 // ---- charts ----
 function mk(id, cfg){ if(charts[id]) charts[id].destroy(); const base = {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:cfg.data.datasets.length>1,labels:{boxWidth:10,font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}; cfg.options=Object.assign(base,cfg.options||{}); charts[id]=new Chart($(id),cfg); }
 function drawForecast(){ const f=D.forecast; mk('cBalance',{type:'line',data:{labels:f.map(x=>x.label),datasets:[{data:f.map(x=>x.balance),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,fill:{target:'origin',above:'rgba(0,122,255,.08)'}}]}}); mk('cExpenses',{type:'bar',data:{labels:f.slice(0,24).map(x=>x.label),datasets:[{data:f.slice(0,24).map(x=>x.expenses),backgroundColor:f.slice(0,24).map(x=>x.big?'#FF9500':'#007AFF'),borderRadius:3}]}}); }
-function drawSavings(){ const f=D.forecast.slice(0,24); mk('cSave',{type:'bar',data:{labels:f.map(x=>x.label),datasets:[{label:'Min',data:f.map(x=>x.minSave),backgroundColor:'#8e8e93',borderRadius:3},{label:'Max',data:f.map(x=>x.maxSave),backgroundColor:'#007AFF',borderRadius:3}]}}); const l=D.log; if(!l.length){ if(charts.cLog){charts.cLog.destroy();delete charts.cLog;} const c=$('cLog').getContext('2d'); c.clearRect(0,0,$('cLog').width,$('cLog').height); $('cLog').parentElement.setAttribute('data-empty','1'); } else { $('cLog').parentElement.removeAttribute('data-empty'); mk('cLog',{type:'line',data:{labels:l.map(x=>new Date(x.t).toLocaleDateString('en-GB',{day:'numeric',month:'short'})),datasets:[{label:'Actual',data:l.map(x=>x.total),borderColor:'#007AFF',borderWidth:2,pointRadius:2,tension:.2},{label:'Expected',data:l.map(x=>x.expected),borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:.2}]}}); } }
+function drawSavings(){ const f=D.forecast.slice(0,24); mk('cSave',{type:'line',data:{labels:f.map(x=>x.label),datasets:[{label:'Min',data:f.map(x=>x.minSave),borderColor:'#8e8e93',borderWidth:2,pointRadius:0,tension:.25},{label:'Max',data:f.map(x=>x.maxSave),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25}]}}); const l=D.log; if(!l.length){ if(charts.cLog){charts.cLog.destroy();delete charts.cLog;} const c=$('cLog').getContext('2d'); c.clearRect(0,0,$('cLog').width,$('cLog').height); $('cLog').parentElement.setAttribute('data-empty','1'); } else { $('cLog').parentElement.removeAttribute('data-empty'); mk('cLog',{type:'line',data:{labels:l.map(x=>new Date(x.t).toLocaleDateString('en-GB',{day:'numeric',month:'short'})),datasets:[{label:'Actual',data:l.map(x=>x.total),borderColor:'#007AFF',borderWidth:2,pointRadius:2,tension:.2},{label:'Expected',data:l.map(x=>x.expected),borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:.2}]}}); } }
 function drawLoan(){ const s=D.loanSeries; mk('cLoan',{type:'line',data:{labels:s.map(x=>x.label),datasets:[{label:'Keep renting',data:s.map(x=>x.rent),borderColor:'#8e8e93',borderWidth:2,pointRadius:0,tension:.2},{label:'Buy (cash + home − loan)',data:s.map(x=>x.wealth),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.2}]}}); }
 
 // ---- actions ----

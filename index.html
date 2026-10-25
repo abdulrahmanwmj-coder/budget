@@ -102,7 +102,7 @@
     <div class="row"><div class="l"><div class="t">Savings this cycle</div><div class="d" id="tmSaveSub"></div></div><div class="v blue" id="tmSave"></div></div>
     <div class="row"><div class="l"><div class="t">Should be spent by now</div><div class="d" id="tmDays"></div></div><div class="v" id="tmSpent"></div></div>
     <div class="row"><div class="l"><div class="t">Still to spend</div></div><div class="v" id="tmRemaining"></div></div>
-    <div class="row"><div class="l"><div class="t">Per day for the rest of the cycle</div></div><div class="v" id="tmDaily"></div></div>
+    <div class="row"><div class="l"><div class="t">Per day for the rest of the cycle</div><div class="d" id="tmDailySub">bar items only (groceries, fuel…) — the part you control</div></div><div class="v" id="tmDaily"></div></div>
     <div class="row"><div class="l"><div class="t">Closing balance</div><div class="d">what will be left on the last day — move it to savings then</div></div><div class="v" id="tmClose"></div></div>
   </div>
 
@@ -115,7 +115,7 @@
   <h1>Items</h1>
   <div class="sub" id="itemsSub"></div>
   <div class="sec">Due this cycle — switch = paid</div>
-  <div class="mini" style="margin:-4px 16px 8px">Monthly bills are assumed paid at the start of the cycle; switch one off if it isn't yet. Big items start unpaid.</div>
+  <div class="mini" style="margin:-4px 16px 8px">Switching an item on takes its amount off your Current balance; switching it back off returns it. Monthly bills start as paid, big items start unpaid.</div>
   <div class="card" id="itemsMonth"></div>
   <div class="sec">All items</div>
   <div class="card" id="itemsAll"></div>
@@ -205,7 +205,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '18';
+const APP_VERSION = '19';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -231,7 +231,8 @@ let ptrY=null, ptrArmed=false;
 document.addEventListener('touchstart',e=>{ ptrY = (window.scrollY<=0) ? e.touches[0].clientY : null; ptrArmed=false; },{passive:true});
 document.addEventListener('touchmove',e=>{ if(ptrY===null) return; const dy=e.touches[0].clientY-ptrY; ptrArmed = dy>80; $('ptr').classList.toggle('on', dy>30); },{passive:true});
 document.addEventListener('touchend',()=>{ $('ptr').classList.remove('on'); if(ptrArmed) refresh(); ptrY=null; ptrArmed=false; });
-function set(d){ D=d; $('loading').style.display='none'; render(); }
+let D0cur = 0;
+function set(d){ D0cur = D ? D.current : d.current; D=d; $('loading').style.display='none'; render(); }
 let showTotal = false; try{ showTotal = sessionStorage.getItem('budgetShowTotal')==='1'; }catch(e){}
 function drawTotal(){ $('tTotal').textContent = showTotal ? SAR(D.total) : 'SAR ••••••'; $('tTotal').style.color = showTotal ? '' : 'var(--sub)'; }
 function toggleTotal(){ showTotal=!showTotal; try{ sessionStorage.setItem('budgetShowTotal', showTotal?'1':'0'); }catch(e){} drawTotal(); }
@@ -256,7 +257,7 @@ function render(){
   $('tmPlanned').textContent=SAR(d.planned);
   const bigNow = d.thisMonth.filter(x=>x.big).map(x=>x.item+' ('+Math.round(x.due).toLocaleString()+')').join(', '); $('tmBig').textContent = bigNow ? 'incl. '+bigNow : 'regular only';
   $('tmSave').textContent = SAR(d.savingsPlan); $('tmSaveSub').textContent = d.savingsPlan>=0 ? 'opening − expenses · move it to savings on salary day' : 'opening − expenses · pull this back from savings';
-  $('tmSpent').textContent=SAR(d.spentPlan); $('tmRemaining').textContent=SAR(d.remaining); $('tmDaily').textContent=SAR(d.dailyLeft);
+  $('tmSpent').textContent=SAR(d.spentPlan); $('tmRemaining').textContent=SAR(d.remaining); $('tmDaily').textContent=SAR(d.dailyLeft); $('tmDailySub').textContent='bar items only — '+SAR(d.remainingVar)+' left over '+d.cycle.left+' days';
   $('tmDays').textContent = d.cycle.elapsed+' of '+d.cycle.days+' days gone · '+d.cycle.left+' left';
   $('tmClose').textContent = SAR(d.closing);
   // upcoming: unpaid big items this cycle + next 2 cycles' big lines
@@ -320,7 +321,7 @@ function drawLoan(){ const s=D.loanSeries; mk('cLoan',{type:'line',data:{labels:
 // ---- actions ----
 function busy(b){ document.querySelectorAll('.btn').forEach(x=>x.disabled=b); }
 function saveBalances(){ busy(true); call('updateBalances', num($('inCurrent').value), num($('inSavings').value), num($('inCard').value), num($('inCash').value)).then(d=>{busy(false);set(d);toast('Balances saved');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
-function togglePaid(item,paid){ call('setPaid',item,paid).then(d=>{set(d);toast(paid?'Marked paid':'Marked unpaid');}).catch(e=>toast('Error: '+e.message)); }
+function togglePaid(item,paid){ const it=D.thisMonth.find(x=>x.item===item); busy(true); call('setPaid',item,paid).then(d=>{busy(false);set(d); const ch=d.current-D0cur; toast(paid?('Paid · current '+(ch<0?'−'+SAR(-ch).replace('SAR ',''):'unchanged')):'Unpaid'+(ch>0?' · '+SAR(ch).replace('SAR ','')+' back to current':''));}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
 function openEdit(row){ editRow=row; const it = row? D.items.find(x=>x.row===row):null; $('editTitle').textContent = it?'Edit item':'Add item'; $('eDelete').style.display = it?'block':'none';
   $('eName').value=it?it.item:''; $('eAmount').value=it?it.amount:''; $('eFreq').value=it?it.freq:'Monthly';
   $('eDate').value = (it && it.add && /^\d{4}-/.test(it.add)) ? it.add.slice(0,10) : ''; $('eHijri').value = (it && it.add && !/^\d{4}-/.test(it.add)) ? it.add : '';

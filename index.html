@@ -134,6 +134,7 @@
     <div class="row" id="eDateRow"><div class="l"><div class="t" id="eDateLabel">Date</div><div class="d" id="eDateHint"></div></div><div class="v"><input type="date" id="eDate"><input id="eHijri" placeholder="18/11" style="display:none"></div></div>
     <div class="row"><div class="l"><div class="t">Stop after (optional)</div><div class="d">last date this is paid</div></div><div class="v"><input type="date" id="eStop"></div></div>
     <div class="row" id="eSpreadRow"><div class="l"><div class="t">Spread over the cycle</div><div class="d">counts per day, like groceries (fuel, clothes, toys…)</div></div><div class="sw" id="eSpread" onclick="toggleSpread()"></div></div>
+    <div class="row" id="eWeekRow"><div class="l"><div class="t">Show per week</div><div class="d">display the bar as SAR / week instead of / day</div></div><div class="sw" id="eWeek" onclick="toggleWeek()"></div></div>
   </div>
   <button class="btn" onclick="saveEdit()">Save</button>
   <button class="btn danger" id="eDelete" onclick="deleteEdit()">Delete item</button>
@@ -205,7 +206,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '24';
+const APP_VERSION = '25';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -273,7 +274,7 @@ function render(){
   let im='';
   d.thisMonth.forEach(x=>{
     const pct = x.due? Math.round(100*(x.due-x.remaining)/x.due):0;
-    const sub = x.fixed ? (x.paid?'paid':'not paid yet') : SAR(x.perDay)+' / day · '+SAR(x.remaining)+' left';
+    const sub = x.fixed ? (x.paid?'paid':'not paid yet') : (x.perWeek ? SAR(x.perDay*7)+' / week' : SAR(x.perDay)+' / day')+' · '+SAR(x.remaining)+' left';
     const ctl = x.fixed ? '<div class="sw '+(x.paid?'on':'')+'" onclick="togglePaid(\''+esc(x.item)+'\','+(!x.paid)+')"></div>' : '<div class="v">'+SAR(x.due)+'</div>';
     const bar = x.fixed ? '' : '<div class="bar"><i style="width:'+pct+'%"></i></div>';
     im += '<div class="row"><div class="l"><div class="t">'+x.item+(x.fixed?' <span class="v mini">'+SAR(x.due)+'</span>':'')+'</div><div class="d">'+sub+'</div>'+bar+'</div>'+ctl+'</div>';
@@ -349,9 +350,10 @@ function togglePaid(item,paid){
 function openEdit(row){ editRow=row; const it = row? D.items.find(x=>x.row===row):null; $('editTitle').textContent = it?'Edit item':'Add item'; $('eDelete').style.display = it?'block':'none';
   $('eName').value=it?it.item:''; $('eAmount').value=it?it.amount:''; $('eFreq').value=it?it.freq:'Monthly';
   $('eDate').value = (it && it.add && /^\d{4}-/.test(it.add)) ? it.add.slice(0,10) : ''; $('eHijri').value = (it && it.add && !/^\d{4}-/.test(it.add)) ? it.add : '';
-  $('eStop').value = it && it.stop ? it.stop.slice(0,10) : ''; $('eSpread').classList.toggle('on', !!(it && it.spread)); editHint(); go('edit'); }
+  $('eStop').value = it && it.stop ? it.stop.slice(0,10) : ''; $('eSpread').classList.toggle('on', !!(it && it.spread)); $('eWeek').classList.toggle('on', !!(it && it.perWeek)); editHint(); go('edit'); }
+function toggleWeek(){ if(!editRow) return toast('Save the item first, then set this'); const it=D.items.find(x=>x.row===editRow); const on=!it.perWeek; $('eWeek').classList.toggle('on',on); call('setSetting','perWeek:'+it.item, on?'true':'false').then(d=>{set(d);toast(on?'Shown per week':'Shown per day');}).catch(e=>toast('Error: '+e.message)); }
 function toggleSpread(){ if(!editRow) return toast('Save the item first, then set this'); const it=D.items.find(x=>x.row===editRow); const on=!it.spread; $('eSpread').classList.toggle('on',on); call('setSpread',it.item,on).then(d=>{set(d);toast(on?'Spread over the month':'Paid once a month');}).catch(e=>toast('Error: '+e.message)); }
-function editHint(){ const f=$('eFreq').value; const r=$('eDateRow'); const h={'Quarterly':'first payment date (sets the 3-month cycle)','Annually':'first month it is due (leave empty for January)','Annually (Hijri)':'Hijri day/month, e.g. 18/11','One Time':'the date it is due'}[f]; r.style.display = h?'flex':'none'; $('eSpreadRow').style.display = f==='Monthly'?'flex':'none'; $('eDateHint').textContent=h||''; $('eDateLabel').textContent = f==='One Time'?'Due date':(f==='Annually (Hijri)'?'Hijri date':'Date'); $('eDate').style.display = f==='Annually (Hijri)'?'none':'block'; $('eHijri').style.display = f==='Annually (Hijri)'?'block':'none'; }
+function editHint(){ const f=$('eFreq').value; const r=$('eDateRow'); const h={'Quarterly':'first payment date (sets the 3-month cycle)','Annually':'first month it is due (leave empty for January)','Annually (Hijri)':'Hijri day/month, e.g. 18/11','One Time':'the date it is due'}[f]; r.style.display = h?'flex':'none'; $('eSpreadRow').style.display = f==='Monthly'?'flex':'none'; const it0=editRow?D.items.find(x=>x.row===editRow):null; $('eWeekRow').style.display = (f==='Daily'||f==='Weekly'||(f==='Monthly'&&it0&&it0.spread))?'flex':'none'; $('eDateHint').textContent=h||''; $('eDateLabel').textContent = f==='One Time'?'Due date':(f==='Annually (Hijri)'?'Hijri date':'Date'); $('eDate').style.display = f==='Annually (Hijri)'?'none':'block'; $('eHijri').style.display = f==='Annually (Hijri)'?'block':'none'; }
 function saveEdit(){ const f=$('eFreq').value; const o={row:editRow,item:$('eName').value.trim(),amount:num($('eAmount').value),freq:f,add: f==='Annually (Hijri)'?$('eHijri').value.trim():($('eDate').value||''),stop:$('eStop').value||''}; if(!o.item) return toast('Name is required'); busy(true); call(editRow?'editExpense':'addExpense',o).then(d=>{busy(false);set(d);go('items');toast('Saved to sheet');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
 let armed={};
 function arm(id,label,fn){ const b=$(id); if(armed[id]){ clearTimeout(armed[id]); armed[id]=null; b.textContent=label; fn(); return; } b.textContent='Tap again to confirm'; armed[id]=setTimeout(()=>{armed[id]=null;b.textContent=label;},3000); }

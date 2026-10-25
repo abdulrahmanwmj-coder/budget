@@ -80,10 +80,10 @@
   <div class="card">
     <div class="big" id="tTotal" onclick="toggleTotal()" style="cursor:pointer"></div>
     <div class="hero" id="tHero"></div>
-    <div class="row"><div class="l"><div class="t">Current</div></div><div class="v"><input type="number" inputmode="decimal" id="inCurrent"></div></div>
-    <div class="row"><div class="l"><div class="t">Saving</div></div><div class="v"><input type="number" inputmode="decimal" id="inSavings"></div></div>
-    <div class="row"><div class="l"><div class="t">Credit</div></div><div class="v"><input type="number" inputmode="decimal" id="inCard"></div></div>
-    <div class="row"><div class="l"><div class="t">Cash</div></div><div class="v"><input type="number" inputmode="decimal" id="inCash"></div></div>
+    <div class="row"><div class="l"><div class="t">Current</div></div><div class="v"><input type="text" inputmode="decimal" id="inCurrent" onblur="fmtField(this)" onfocus="rawField(this)"></div></div>
+    <div class="row"><div class="l"><div class="t">Saving</div></div><div class="v"><input type="text" inputmode="decimal" id="inSavings" onblur="fmtField(this)" onfocus="rawField(this)"></div></div>
+    <div class="row"><div class="l"><div class="t">Credit</div></div><div class="v"><input type="text" inputmode="decimal" id="inCard" onblur="fmtField(this)" onfocus="rawField(this)"></div></div>
+    <div class="row"><div class="l"><div class="t">Cash</div></div><div class="v"><input type="text" inputmode="decimal" id="inCash" onblur="fmtField(this)" onfocus="rawField(this)"></div></div>
   </div>
   <button class="btn" id="btnBal" onclick="saveBalances()">Update balances</button>
 
@@ -205,7 +205,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '19';
+const APP_VERSION = '20';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -242,7 +242,7 @@ function render(){
   $('dateLine').textContent = hijriToday() + ' · ' + d.hijri;
   drawTotal();
   $('tHero').textContent = 'current ' + SAR(d.current) + ' · saving ' + SAR(d.savings) + ' · credit ' + SAR(d.card||0) + ' · cash ' + SAR(d.cash||0);
-  $('inCurrent').value = d.current; $('inSavings').value = d.savings; $('inCard').value = d.card||0; $('inCash').value = d.cash||0;
+  $('inCurrent').value = money(d.current); $('inSavings').value = money(d.savings); $('inCard').value = money(d.card||0); $('inCash').value = money(d.cash||0);
   // plan check — spending accounts vs plan, savings account vs plan
   const sg = (v) => (v>=0?'+':'')+SAR(v);
   const ps=$('pcSpend'); ps.textContent = sg(d.spendDelta); ps.className='v '+(d.spendDelta>=0?'pos':'neg');
@@ -306,7 +306,10 @@ function render(){
   const cur = document.querySelector('.page.on').id.replace('p-','');
   if(cur==='forecast') drawForecast(); if(cur==='savings') drawSavings(); if(cur==='loan') drawLoan();
 }
-function num(v){ return typeof v==='number'?v:(parseFloat(v)||0); }
+function num(v){ return typeof v==='number'?v:(parseFloat(String(v).replace(/,/g,''))||0); }
+function money(v){ return (Math.round(num(v)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtField(el){ el.value = money(el.value); }
+function rawField(el){ const v=num(el.value); el.value = v ? String(Math.round(v*100)/100) : ''; setTimeout(()=>{ try{ el.select(); }catch(e){} },0); }
 function hijriToday(){ try{ return new Intl.DateTimeFormat('en-u-ca-islamic-umalqura',{day:'numeric',month:'long',year:'numeric'}).format(new Date()).replace(' AH',''); }catch(e){ return ''; } }
 function esc(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 function rowHtml(t,d,v){ return '<div class="row"><div class="l"><div class="t">'+t+'</div>'+(d?'<div class="d">'+d+'</div>':'')+'</div><div class="v">'+v+'</div></div>'; }

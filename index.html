@@ -80,12 +80,10 @@
   <div class="card">
     <div class="big" id="tTotal" onclick="toggleTotal()" style="cursor:pointer"></div>
     <div class="hero" id="tHero"></div>
-    <div class="row"><div class="l"><div class="t">Current</div></div><div class="v"><input type="text" inputmode="decimal" id="inCurrent" onblur="fmtField(this)" onfocus="rawField(this)"></div></div>
-    <div class="row"><div class="l"><div class="t">Saving</div></div><div class="v"><input type="text" inputmode="decimal" id="inSavings" onblur="fmtField(this)" onfocus="rawField(this)"></div></div>
-    <div class="row"><div class="l"><div class="t">Credit</div></div><div class="v"><input type="text" inputmode="decimal" id="inCard" onblur="fmtField(this)" onfocus="rawField(this)"></div></div>
-    <div class="row"><div class="l"><div class="t">Cash</div></div><div class="v"><input type="text" inputmode="decimal" id="inCash" onblur="fmtField(this)" onfocus="rawField(this)"></div></div>
+    <div id="accRows"></div>
   </div>
   <button class="btn" id="btnBal" onclick="saveBalances()">Update balances</button>
+  <button class="btn sec2" onclick="openAcc(null)">Add account</button>
 
   <div class="sec">Plan check</div>
   <div class="card">
@@ -139,6 +137,20 @@
   <button class="btn" onclick="saveEdit()">Save</button>
   <button class="btn danger" id="eDelete" onclick="deleteEdit()">Delete item</button>
   <button class="btn sec2" onclick="go('items')">Cancel</button>
+</div>
+
+<!-- ACCOUNT (sub-page) -->
+<div class="page" id="p-acc">
+  <h1 id="accTitle">Add account</h1>
+  <div class="sub">Name it as you like. Tap an account name on Today to come back here.</div>
+  <div class="card">
+    <div class="row"><div class="l"><div class="t">Name</div></div><div class="v" style="flex:1.3"><input id="aName" placeholder="e.g. Al Rajhi, Wallet, Emergency fund"></div></div>
+    <div class="row"><div class="l"><div class="t">Type</div><div class="d" id="aKindHint"></div></div><div class="v"><select id="aKind" onchange="accHint()"><option value="spend">Spending</option><option value="save">Savings</option></select></div></div>
+    <div class="row" id="aDedRow"><div class="l"><div class="t">Ticked items come out of this</div><div class="d">one spending account carries the deductions (marked ●)</div></div><div class="sw" id="aDed" onclick="this.classList.toggle('on')"></div></div>
+  </div>
+  <button class="btn" onclick="saveAcc()">Save</button>
+  <button class="btn danger" id="aDelete" onclick="deleteAcc()">Delete account</button>
+  <button class="btn sec2" onclick="go('today')">Cancel</button>
 </div>
 
 <!-- FORECAST -->
@@ -206,7 +218,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '25';
+const APP_VERSION = '26';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -235,8 +247,7 @@ let ptrY=null, ptrArmed=false;
 document.addEventListener('touchstart',e=>{ ptrY = (window.scrollY<=0) ? e.touches[0].clientY : null; ptrArmed=false; },{passive:true});
 document.addEventListener('touchmove',e=>{ if(ptrY===null) return; const dy=e.touches[0].clientY-ptrY; ptrArmed = dy>80; $('ptr').classList.toggle('on', dy>30); },{passive:true});
 document.addEventListener('touchend',()=>{ $('ptr').classList.remove('on'); if(ptrArmed) refresh(); ptrY=null; ptrArmed=false; });
-let D0cur = 0;
-function set(d){ D0cur = D ? D.current : d.current; D=d; $('loading').style.display='none'; render(); try{ localStorage.setItem('budgetLast', JSON.stringify(d)); }catch(e){} }
+function set(d){ D=d; $('loading').style.display='none'; render(); try{ localStorage.setItem('budgetLast', JSON.stringify(d)); }catch(e){} }
 let showTotal = false; try{ showTotal = sessionStorage.getItem('budgetShowTotal')==='1'; }catch(e){}
 function drawTotal(){ $('tTotal').textContent = showTotal ? SAR(D.total) : 'SAR ••••••'; $('tTotal').style.color = showTotal ? '' : 'var(--sub)'; }
 function toggleTotal(){ showTotal=!showTotal; try{ sessionStorage.setItem('budgetShowTotal', showTotal?'1':'0'); }catch(e){} drawTotal(); }
@@ -245,14 +256,14 @@ function render(){
   const d=D;
   $('dateLine').textContent = hijriToday() + ' · ' + d.hijri;
   drawTotal();
-  $('tHero').textContent = 'current ' + SAR(d.current) + ' · saving ' + SAR(d.savings) + ' · credit ' + SAR(d.card||0) + ' · cash ' + SAR(d.cash||0);
-  $('inCurrent').value = money(d.current); $('inSavings').value = money(d.savings); $('inCard').value = money(d.card||0); $('inCash').value = money(d.cash||0);
+  $('tHero').textContent = 'spending ' + SAR(d.spendable) + ' · savings ' + SAR(d.savings);
+  renderAccounts(d.accounts||[]);
   // plan check — spending accounts vs plan, savings account vs plan
   const sg = (v) => (v>=0?'+':'')+SAR(v);
   const ps=$('pcSpend'); ps.textContent = sg(d.spendDelta); ps.className='v '+(d.spendDelta>=0?'pos':'neg');
-  $('pcSpendSub').textContent = 'current + credit + cash '+SAR(d.spendable)+' · plan says '+SAR(d.expectedSpendable)+(d.hasOpening?'':' (opening not frozen yet — switch on the salary when it lands)');
+  $('pcSpendSub').textContent = 'spending accounts '+SAR(d.spendable)+' · plan says '+SAR(d.expectedSpendable)+(d.hasOpening?'':' (opening not frozen yet — switch on the salary when it lands)');
   const pv=$('pcSave'); pv.textContent = sg(d.savingsDelta); pv.className='v '+(d.savingsDelta>=-1?'pos':'neg');
-  $('pcSaveSub').textContent = d.savingsDelta < -1 ? 'move '+SAR(-d.savingsDelta)+' to savings · account '+SAR(d.savings)+' vs plan '+SAR(d.cumTarget) : 'savings account '+SAR(d.savings)+' · plan '+SAR(d.cumTarget);
+  $('pcSaveSub').textContent = d.savingsDelta < -1 ? 'move '+SAR(-d.savingsDelta)+' to savings · savings accounts '+SAR(d.savings)+' vs plan '+SAR(d.cumTarget) : 'savings accounts '+SAR(d.savings)+' · plan '+SAR(d.cumTarget);
   $('pcSal').classList.toggle('on', !!d.salaryReceived); $('pcSalSub').textContent = (({'auto':'detected from your balance','manual-yes':'set by you','manual-no':'set by you: not yet','none':'not seen yet · switch on when it lands'})[d.salaryMode] || '') + (d.cycle.early ? ' · cycle started early on '+fmtAdd(d.cycle.start) : '');
   $('pcNextRow').style.display = (d.hasOpening && d.cycle.left <= 10) ? 'flex' : 'none';
   // this cycle
@@ -322,16 +333,36 @@ function fmtAdd(v){ if(/^\d{4}-\d{2}-\d{2}/.test(v)){ const p=v.slice(0,10).spli
 // ---- charts ----
 function mk(id, cfg){ if(charts[id]) charts[id].destroy(); const base = {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:cfg.data.datasets.length>1,labels:{boxWidth:10,font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}; cfg.options=Object.assign(base,cfg.options||{}); charts[id]=new Chart($(id),cfg); }
 function drawForecast(){ const f=D.forecast; mk('cBalance',{type:'line',data:{labels:f.map(x=>x.label),datasets:[{data:f.map(x=>x.cumulative),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,fill:{target:'origin',above:'rgba(0,122,255,.08)'}}]}}); mk('cExpenses',{type:'bar',data:{labels:f.slice(0,24).map(x=>x.label),datasets:[{data:f.slice(0,24).map(x=>x.expenses),backgroundColor:f.slice(0,24).map(x=>x.big?'#FF9500':'#007AFF'),borderRadius:3}]}}); }
-function drawSavings(){ const f=D.forecast.slice(0,24); mk('cSave',{type:'bar',data:{labels:f.map(x=>x.label),datasets:[{label:'Savings each cycle',data:f.map(x=>x.savings),backgroundColor:f.map(x=>x.savings<0?'#FF3B30':'#8e8e93'),borderRadius:3,order:2},{label:'Cumulative',type:'line',data:f.map(x=>x.cumulative),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,order:1}]}}); const l=D.log; if(!l.length){ if(charts.cLog){charts.cLog.destroy();delete charts.cLog;} const c=$('cLog').getContext('2d'); c.clearRect(0,0,$('cLog').width,$('cLog').height); $('cLog').parentElement.setAttribute('data-empty','1'); } else { $('cLog').parentElement.removeAttribute('data-empty'); mk('cLog',{type:'line',data:{labels:l.map(x=>new Date(x.t).toLocaleDateString('en-GB',{day:'numeric',month:'short'})),datasets:[{label:'Current + credit + cash',data:l.map(x=>x.current+x.card+x.cash),borderColor:'#007AFF',borderWidth:2,pointRadius:2,tension:.2},{label:'Plan',data:l.map(x=>x.expected),borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:.2}]}}); } }
+function drawSavings(){ const f=D.forecast.slice(0,24); mk('cSave',{type:'bar',data:{labels:f.map(x=>x.label),datasets:[{label:'Savings each cycle',data:f.map(x=>x.savings),backgroundColor:f.map(x=>x.savings<0?'#FF3B30':'#8e8e93'),borderRadius:3,order:2},{label:'Cumulative',type:'line',data:f.map(x=>x.cumulative),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,order:1}]}}); const l=D.log; if(!l.length){ if(charts.cLog){charts.cLog.destroy();delete charts.cLog;} const c=$('cLog').getContext('2d'); c.clearRect(0,0,$('cLog').width,$('cLog').height); $('cLog').parentElement.setAttribute('data-empty','1'); } else { $('cLog').parentElement.removeAttribute('data-empty'); mk('cLog',{type:'line',data:{labels:l.map(x=>new Date(x.t).toLocaleDateString('en-GB',{day:'numeric',month:'short'})),datasets:[{label:'Spending accounts',data:l.map(x=>x.current+(x.card||0)+(x.cash||0)),borderColor:'#007AFF',borderWidth:2,pointRadius:2,tension:.2},{label:'Plan',data:l.map(x=>x.expected),borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:.2}]}}); } }
 function drawLoan(){ const s=D.loanSeries; mk('cLoan',{type:'line',data:{labels:s.map(x=>x.label),datasets:[{label:'Keep renting',data:s.map(x=>x.rent),borderColor:'#8e8e93',borderWidth:2,pointRadius:0,tension:.2},{label:'Buy (cash + home − loan)',data:s.map(x=>x.wealth),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.2}]}}); }
 
 // ---- actions ----
 function busy(b){ document.querySelectorAll('.btn').forEach(x=>x.disabled=b); }
-function saveBalances(){ const c=num($('inCurrent').value), sv=num($('inSavings').value), cd=num($('inCard').value), ch=num($('inCash').value);
-  const dc=c-D.current, dsv=sv-D.savings, dcd=cd-D.card, dch=ch-D.cash;
-  D.current=c; D.savings=sv; D.card=cd; D.cash=ch; D.spendable+=dc+dcd+dch; D.total+=dc+dsv+dcd+dch; D.spendDelta+=dc+dcd+dch; D.savingsDelta+=dsv; D.moved+=dsv; D.expectedSpendable-=dsv; D.closing+=dc+dcd+dch;
+// ---- accounts ----
+let accKey = '';
+function escH(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function renderAccounts(accs){
+  const key = accs.map(a=>a.row+'|'+a.name+'|'+a.kind+'|'+(a.deduct?1:0)).join(';');
+  if(key!==accKey){
+    accKey=key;
+    $('accRows').innerHTML = accs.length ? accs.map(a=>'<div class="row"><div class="l" onclick="openAcc('+a.row+')" style="cursor:pointer"><div class="t">'+escH(a.name)+(a.deduct?' <span class="mini">●</span>':'')+'</div><div class="d">'+(a.kind==='save'?'savings':'spending')+' <span class="mini">›</span></div></div><div class="v"><input type="text" inputmode="decimal" data-row="'+a.row+'" onblur="fmtField(this)" onfocus="rawField(this)"></div></div>').join('') : '<div class="row"><div class="l"><div class="d">No accounts yet — add one below</div></div></div>';
+  }
+  accs.forEach(a=>{ const el=document.querySelector('#accRows input[data-row="'+a.row+'"]'); if(el && document.activeElement!==el) el.value=money(a.balance); });
+}
+function saveBalances(){
+  const list=[]; let dSp=0, dSv=0;
+  (D.accounts||[]).forEach(a=>{ const el=document.querySelector('#accRows input[data-row="'+a.row+'"]'); if(!el) return; const v=Math.round(num(el.value)*100)/100; const dv=v-a.balance; if(a.kind==='save') dSv+=dv; else dSp+=dv; a.balance=v; list.push({row:a.row,balance:v}); });
+  const da=(D.accounts||[]).find(a=>a.row===D.deductRow); D.current = da?da.balance:D.current;
+  D.spendable+=dSp; D.savings+=dSv; D.total+=dSp+dSv; D.spendDelta+=dSp; D.savingsDelta+=dSv; D.moved+=dSv; D.expectedSpendable-=dSv; D.closing+=dSp;
   render(); syncing(true); toast('Saving…'); const my=++reqSeq;
-  call('updateBalances', c, sv, cd, ch).then(d=>{settle(my,d); toast('Balances saved');}).catch(e=>{syncing(false);toast('Not saved: '+e.message); load();}); }
+  call('updateAccounts', list).then(d=>{settle(my,d); toast('Balances saved');}).catch(e=>{syncing(false);toast('Not saved: '+e.message); load();}); }
+let accRow=null;
+function openAcc(row){ accRow=row; const a=row?(D.accounts||[]).find(x=>x.row===row):null; $('accTitle').textContent=a?'Edit account':'Add account'; $('aName').value=a?a.name:''; $('aKind').value=a?a.kind:'spend'; $('aDed').classList.toggle('on', !!(a&&a.deduct)); $('aDelete').style.display=a?'block':'none'; $('aDelete').textContent='Delete account'; accHint(); go('acc'); }
+function accHint(){ const k=$('aKind').value; $('aKindHint').textContent = k==='save' ? 'counts towards the Savings check' : 'money to spend this cycle (Spending check)'; $('aDedRow').style.display = k==='save'?'none':'flex'; }
+function saveAcc(){ const name=$('aName').value.trim(); if(!name) return toast('Name is required'); const kind=$('aKind').value; const ded = kind==='spend' && $('aDed').classList.contains('on'); busy(true);
+  (accRow ? call('editAccount',accRow,name,kind,ded) : call('addAccount',name,kind,ded)).then(d=>{busy(false);set(d);go('today');toast(accRow?'Account updated':'Account added');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
+function deleteAcc(){ const a=(D.accounts||[]).find(x=>x.row===accRow); if(a && Math.abs(a.balance)>0.005 && !armed['aDelete']) toast('Balance '+SAR(a.balance)+' will leave the totals — tap again to confirm');
+  arm('aDelete','Delete account',()=>{ busy(true); call('deleteAccount',accRow).then(d=>{busy(false);set(d);go('today');toast('Account removed');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }); }
 // Optimistic: apply the tick on screen right away, then let the server's answer replace it.
 let pending = 0, reqSeq = 0, lastSeen = 0, outOfOrder = false;
 function syncing(on){ pending += on?1:-1; $('btnRefresh').classList.toggle('spin', pending>0); }
@@ -342,8 +373,9 @@ function togglePaid(item,paid){
   const was=it.paid; const due=it.due;
   it.paid=paid; it.remaining=paid?0:due; it.done=paid?due:0;
   D.remaining += paid?-due:due; D.spentPlan += paid?due:-due;
-  if(paid && !was){ D.current-=due; D.spendable-=due; D.expectedSpendable-=due; }
-  if(!paid && was && !it.defPaidUntouched){ D.current+=due; D.spendable+=due; D.expectedSpendable+=due; }
+  const da=(D.accounts||[]).find(a=>a.row===D.deductRow);
+  if(paid && !was){ D.current-=due; D.spendable-=due; D.expectedSpendable-=due; if(da) da.balance-=due; }
+  if(!paid && was && !it.defPaidUntouched){ D.current+=due; D.spendable+=due; D.expectedSpendable+=due; if(da) da.balance+=due; }
   render(); syncing(true); const my=++reqSeq;
   call('setPaid',item,paid).then(d=>settle(my,d)).catch(e=>{ syncing(false); toast('Not saved: '+e.message); load(); });
 }

@@ -16,7 +16,7 @@ const LOG = 'App Log';
 const PAID = 'App Paid';
 const SETTINGS = 'App Settings';
 const HISTORY = 'App History';
-const ACCOUNTS = 'App Accounts';   // Name | Balance | Kind (spend/save) | Deduct (1 = ticked items come out of this one)
+const ACCOUNTS = 'App Accounts';   // Name | Balance | Kind (spend/save) | Deduct (1 = ticked items come out of this one) | Order | Color
 const FIXED = ['Monthly', 'Quarterly', 'Annually', 'Annually (Hijri)', 'One Time'];
 const DEFAULT_PAID = ['Monthly'];           // assumed paid at the start of the cycle unless switched off
 const BIG = ['Quarterly', 'Annually', 'Annually (Hijri)', 'One Time'];
@@ -34,7 +34,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const want = PropertiesService.getScriptProperties().getProperty('APP_TOKEN');
     if (!want || String(body.token || '') !== want) throw new Error('Wrong passphrase');
-    const API = { getData, updateBalances, updateAccounts, addAccount, editAccount, deleteAccount, setPaid, addExpense, editExpense, deleteExpense, updateLoan, setSetting, setSpread, monthlyClose, salaryLanded };
+    const API = { getData, updateBalances, updateAccounts, addAccount, editAccount, deleteAccount, moveAccount, setPaid, addExpense, editExpense, deleteExpense, updateLoan, setSetting, setSpread, monthlyClose, salaryLanded };
     const fn = API[body.fn];
     if (!fn) throw new Error('Unknown function: ' + body.fn);
     const lock = LockService.getScriptLock();
@@ -114,13 +114,13 @@ function createAccountsSheet() {
   const s = ss();
   if (s.getSheetByName(ACCOUNTS)) return;
   const t = s.insertSheet(ACCOUNTS);
-  t.appendRow(['Name', 'Balance', 'Kind', 'Deduct']);
+  t.appendRow(['Name', 'Balance', 'Kind', 'Deduct', 'Order', 'Color']);
   const mv = s.getSheetByName(MONTH).getRange('A41:A47').getValues();
-  t.getRange(2, 1, 4, 4).setValues([
-    ['Current', r2(mv[0][0]), 'spend', 1],
-    ['Saving', r2(mv[2][0]), 'save', ''],
-    ['Credit', r2(mv[4][0]), 'spend', ''],
-    ['Cash', r2(mv[6][0]), 'spend', '']
+  t.getRange(2, 1, 4, 6).setValues([
+    ['Current', r2(mv[0][0]), 'spend', 1, 1, ''],
+    ['Saving', r2(mv[2][0]), 'save', '', 2, ''],
+    ['Credit', r2(mv[4][0]), 'spend', '', 3, ''],
+    ['Cash', r2(mv[6][0]), 'spend', '', 4, '']
   ]);
   t.getRange('B:B').setNumberFormat('#,##0.00');
   try { s.getSheetByName(PLAN).getRange('T10').setValue('Spendable now (all spending accounts)'); } catch (e) {}
@@ -131,9 +131,11 @@ function readAccounts() {
   if (!t) { createAccountsSheet(); t = sh(ACCOUNTS); }
   const last = t.getLastRow();
   if (last < 2) return [];
-  return t.getRange(2, 1, last - 1, 4).getValues()
-    .map((r, i) => ({ row: i + 2, name: String(r[0]).trim(), balance: r2(r[1]), kind: String(r[2]).toLowerCase() === 'save' ? 'save' : 'spend', deduct: r[3] === true || num(r[3]) === 1 }))
-    .filter(a => a.name);
+  if (t.getRange('E1').getValue() === '') t.getRange('E1:F1').setValues([['Order', 'Color']]);
+  return t.getRange(2, 1, last - 1, 6).getValues()
+    .map((r, i) => ({ row: i + 2, name: String(r[0]).trim(), balance: r2(r[1]), kind: String(r[2]).toLowerCase() === 'save' ? 'save' : 'spend', deduct: r[3] === true || num(r[3]) === 1, order: r[4] === '' ? i + 2 : num(r[4]), color: String(r[5] || '') }))
+    .filter(a => a.name)
+    .sort((a, b) => a.order - b.order || a.row - b.row);
 }
 function deductAccount(accs) { return accs.find(a => a.deduct && a.kind === 'spend') || accs.find(a => a.kind === 'spend') || null; }
 function sumKind(accs, kind) { return r2(accs.filter(a => a.kind === kind).reduce((x, a) => x + a.balance, 0)); }
@@ -161,7 +163,7 @@ function updateAccounts(list) {
   d.log.push({ t: new Date().toISOString(), current: d.spendable, savings: d.savings, total: d.total, expected: d.expectedSpendable, delta: d.spendDelta });
   return d;
 }
-function addAccount(name, kind, deduct) {
+function addAccount(name, kind, deduct, color) {
   ensureAppSheets();
   name = String(name || '').trim(); if (!name) throw new Error('Name is required');
   const accs = readAccounts();
@@ -169,11 +171,12 @@ function addAccount(name, kind, deduct) {
   kind = kind === 'save' ? 'save' : 'spend';
   const t = sh(ACCOUNTS);
   if (deduct && kind === 'spend') accs.forEach(a => { if (a.deduct) t.getRange(a.row, 4).setValue(''); });
-  t.appendRow([name, 0, kind, (deduct && kind === 'spend') ? 1 : '']);
+  const maxOrder = accs.reduce((m, a) => Math.max(m, a.order), 0);
+  t.appendRow([name, 0, kind, (deduct && kind === 'spend') ? 1 : '', maxOrder + 1, String(color || '')]);
   SpreadsheetApp.flush();
   return getData();
 }
-function editAccount(row, name, kind, deduct) {
+function editAccount(row, name, kind, deduct, color) {
   ensureAppSheets();
   row = Number(row); name = String(name || '').trim(); if (!name) throw new Error('Name is required');
   const accs = readAccounts(); const a = accs.find(x => x.row === row); if (!a) throw new Error('Account not found');
@@ -181,7 +184,21 @@ function editAccount(row, name, kind, deduct) {
   kind = kind === 'save' ? 'save' : 'spend';
   const t = sh(ACCOUNTS);
   if (deduct && kind === 'spend') accs.forEach(x => { if (x.deduct && x.row !== row) t.getRange(x.row, 4).setValue(''); });
-  t.getRange(row, 1, 1, 4).setValues([[name, a.balance, kind, (deduct && kind === 'spend') ? 1 : '']]);
+  t.getRange(row, 1, 1, 6).setValues([[name, a.balance, kind, (deduct && kind === 'spend') ? 1 : '', a.order, color === undefined || color === null ? a.color : String(color)]]);
+  SpreadsheetApp.flush();
+  return getData();
+}
+// Move an account one step up (dir = -1) or down (dir = +1) in the list.
+function moveAccount(row, dir) {
+  ensureAppSheets();
+  row = Number(row); dir = Number(dir) < 0 ? -1 : 1;
+  const accs = readAccounts();               // already sorted by order
+  const i = accs.findIndex(a => a.row === row); if (i < 0) throw new Error('Account not found');
+  const j = i + dir; if (j < 0 || j >= accs.length) return getData();
+  const t = sh(ACCOUNTS);
+  // renumber 1..n so the order column is always clean, then swap i and j
+  const tmp = accs[i]; accs[i] = accs[j]; accs[j] = tmp;
+  accs.forEach((a, k) => t.getRange(a.row, 5).setValue(k + 1));
   SpreadsheetApp.flush();
   return getData();
 }

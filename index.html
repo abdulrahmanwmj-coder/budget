@@ -52,6 +52,8 @@
   .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:var(--sub);background:var(--bg);z-index:9}
   .pill{font-size:12px;padding:2px 8px;border-radius:10px;background:var(--line);color:var(--sub)}
   details summary{list-style:none;cursor:pointer}details summary::-webkit-details-marker{display:none}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:1px}
+  .swatches{display:flex;gap:10px;flex-wrap:wrap;padding:12px 16px}.swatch{width:30px;height:30px;border-radius:50%;border:3px solid transparent;box-sizing:border-box}.swatch.on{border-color:var(--text)}.swatch.none{background:var(--line)}
   .link{color:var(--blue);background:none;border:0;font:inherit;font-size:15px;padding:0}
   .refresh{position:fixed;top:calc(14px + env(safe-area-inset-top));right:16px;width:36px;height:36px;border-radius:18px;border:0;background:var(--card);color:var(--blue);font-size:20px;line-height:36px;text-align:center;padding:0;z-index:5;box-shadow:0 1px 3px rgba(0,0,0,.15)}
   .refresh.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
@@ -146,6 +148,8 @@
   <div class="card">
     <div class="row"><div class="l"><div class="t">Name</div></div><div class="v" style="flex:1.3"><input id="aName" placeholder="e.g. Al Rajhi, Wallet, Emergency fund"></div></div>
     <div class="row"><div class="l"><div class="t">Type</div><div class="d" id="aKindHint"></div></div><div class="v"><select id="aKind" onchange="accHint()"><option value="spend">Spending</option><option value="save">Savings</option></select></div></div>
+    <div class="row" style="flex-direction:column;align-items:stretch;padding:0"><div class="l" style="padding:12px 16px 0"><div class="t">Colour label</div></div><div class="swatches" id="aColors"></div></div>
+    <div class="row" id="aOrderRow"><div class="l"><div class="t">Position in the list</div><div class="d" id="aOrderSub"></div></div><div class="v"><button class="link" onclick="moveAcc(-1)" style="padding:6px 10px">▲ Up</button> <button class="link" onclick="moveAcc(1)" style="padding:6px 10px">▼ Down</button></div></div>
     <div class="row" id="aDedRow"><div class="l"><div class="t">Ticked items come out of this</div><div class="d">one spending account carries the deductions (marked ●)</div></div><div class="sw" id="aDed" onclick="this.classList.toggle('on')"></div></div>
   </div>
   <button class="btn" onclick="saveAcc()">Save</button>
@@ -218,7 +222,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '26';
+const APP_VERSION = '27';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -342,10 +346,10 @@ function busy(b){ document.querySelectorAll('.btn').forEach(x=>x.disabled=b); }
 let accKey = '';
 function escH(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 function renderAccounts(accs){
-  const key = accs.map(a=>a.row+'|'+a.name+'|'+a.kind+'|'+(a.deduct?1:0)).join(';');
+  const key = accs.map(a=>a.row+'|'+a.name+'|'+a.kind+'|'+(a.deduct?1:0)+'|'+(a.color||'')).join(';');
   if(key!==accKey){
     accKey=key;
-    $('accRows').innerHTML = accs.length ? accs.map(a=>'<div class="row"><div class="l" onclick="openAcc('+a.row+')" style="cursor:pointer"><div class="t">'+escH(a.name)+(a.deduct?' <span class="mini">●</span>':'')+'</div><div class="d">'+(a.kind==='save'?'savings':'spending')+' <span class="mini">›</span></div></div><div class="v"><input type="text" inputmode="decimal" data-row="'+a.row+'" onblur="fmtField(this)" onfocus="rawField(this)"></div></div>').join('') : '<div class="row"><div class="l"><div class="d">No accounts yet — add one below</div></div></div>';
+    $('accRows').innerHTML = accs.length ? accs.map(a=>'<div class="row"><div class="l" onclick="openAcc('+a.row+')" style="cursor:pointer"><div class="t">'+(a.color?'<span class="dot" style="background:'+a.color+'"></span>':'')+escH(a.name)+(a.deduct?' <span class="mini">●</span>':'')+'</div><div class="d">'+(a.kind==='save'?'savings':'spending')+' <span class="mini">›</span></div></div><div class="v"><input type="text" inputmode="decimal" data-row="'+a.row+'" onblur="fmtField(this)" onfocus="rawField(this)"></div></div>').join('') : '<div class="row"><div class="l"><div class="d">No accounts yet — add one below</div></div></div>';
   }
   accs.forEach(a=>{ const el=document.querySelector('#accRows input[data-row="'+a.row+'"]'); if(el && document.activeElement!==el) el.value=money(a.balance); });
 }
@@ -357,10 +361,16 @@ function saveBalances(){
   render(); syncing(true); toast('Saving…'); const my=++reqSeq;
   call('updateAccounts', list).then(d=>{settle(my,d); toast('Balances saved');}).catch(e=>{syncing(false);toast('Not saved: '+e.message); load();}); }
 let accRow=null;
-function openAcc(row){ accRow=row; const a=row?(D.accounts||[]).find(x=>x.row===row):null; $('accTitle').textContent=a?'Edit account':'Add account'; $('aName').value=a?a.name:''; $('aKind').value=a?a.kind:'spend'; $('aDed').classList.toggle('on', !!(a&&a.deduct)); $('aDelete').style.display=a?'block':'none'; $('aDelete').textContent='Delete account'; accHint(); go('acc'); }
+const COLORS=['','#FF3B30','#FF9500','#FFCC00','#34C759','#30B0C7','#007AFF','#5856D6','#AF52DE','#FF2D55','#A2845E','#8E8E93'];
+let accColor='';
+function drawSwatches(){ $('aColors').innerHTML = COLORS.map(c=>'<div class="swatch'+(c?'':' none')+(c===accColor?' on':'')+'" style="'+(c?'background:'+c:'')+'" onclick="pickColor(\''+c+'\')"></div>').join(''); }
+function pickColor(c){ accColor=c; drawSwatches(); }
+function openAcc(row){ accRow=row; const a=row?(D.accounts||[]).find(x=>x.row===row):null; $('accTitle').textContent=a?'Edit account':'Add account'; $('aName').value=a?a.name:''; $('aKind').value=a?a.kind:'spend'; $('aDed').classList.toggle('on', !!(a&&a.deduct)); accColor=a?(a.color||''):''; drawSwatches(); $('aOrderRow').style.display=a?'flex':'none'; orderSub(); $('aDelete').style.display=a?'block':'none'; $('aDelete').textContent='Delete account'; accHint(); go('acc'); }
+function orderSub(){ const l=D.accounts||[]; const i=l.findIndex(x=>x.row===accRow); $('aOrderSub').textContent = i>=0 ? (i+1)+' of '+l.length : ''; }
+function moveAcc(dir){ if(!accRow) return; const l=D.accounts||[]; const i=l.findIndex(x=>x.row===accRow); const j=i+dir; if(i<0||j<0||j>=l.length) return; const t=l[i]; l[i]=l[j]; l[j]=t; orderSub(); renderAccounts(l); syncing(true); const my=++reqSeq; call('moveAccount',accRow,dir).then(d=>{settle(my,d); orderSub();}).catch(e=>{syncing(false);toast('Not saved: '+e.message); load();}); }
 function accHint(){ const k=$('aKind').value; $('aKindHint').textContent = k==='save' ? 'counts towards the Savings check' : 'money to spend this cycle (Spending check)'; $('aDedRow').style.display = k==='save'?'none':'flex'; }
 function saveAcc(){ const name=$('aName').value.trim(); if(!name) return toast('Name is required'); const kind=$('aKind').value; const ded = kind==='spend' && $('aDed').classList.contains('on'); busy(true);
-  (accRow ? call('editAccount',accRow,name,kind,ded) : call('addAccount',name,kind,ded)).then(d=>{busy(false);set(d);go('today');toast(accRow?'Account updated':'Account added');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
+  (accRow ? call('editAccount',accRow,name,kind,ded,accColor) : call('addAccount',name,kind,ded,accColor)).then(d=>{busy(false);set(d);go('today');toast(accRow?'Account updated':'Account added');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }
 function deleteAcc(){ const a=(D.accounts||[]).find(x=>x.row===accRow); if(a && Math.abs(a.balance)>0.005 && !armed['aDelete']) toast('Balance '+SAR(a.balance)+' will leave the totals — tap again to confirm');
   arm('aDelete','Delete account',()=>{ busy(true); call('deleteAccount',accRow).then(d=>{busy(false);set(d);go('today');toast('Account removed');}).catch(e=>{busy(false);toast('Error: '+e.message);}); }); }
 // Optimistic: apply the tick on screen right away, then let the server's answer replace it.

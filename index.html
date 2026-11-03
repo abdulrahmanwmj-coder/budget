@@ -78,6 +78,7 @@
 <div class="page on" id="p-today">
   <h1>Today</h1>
   <div class="sub" id="dateLine"></div>
+  <div class="sub" id="cycleLine" style="margin-top:2px"></div>
 
   <div class="card">
     <div class="big" id="tTotal" onclick="toggleTotal()" style="cursor:pointer"></div>
@@ -222,7 +223,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '27';
+const APP_VERSION = '28';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -259,6 +260,7 @@ function toggleTotal(){ showTotal=!showTotal; try{ sessionStorage.setItem('budge
 function render(){
   const d=D;
   $('dateLine').textContent = hijriToday() + ' · ' + d.hijri;
+  { const e=d.cycle.end.slice(0,10).split('-'); const ns=new Date(+e[0],+e[1]-1,+e[2]+1); const nsTxt=ns.toLocaleDateString('en-GB',{day:'numeric',month:'short'}); const dl=d.cycle.left; $('cycleLine').textContent = (dl<=0 ? 'Last day of the cycle' : dl+(dl===1?' day':' days')+' left in the cycle') + ' · next salary ' + nsTxt; }
   drawTotal();
   $('tHero').textContent = 'spending ' + SAR(d.spendable) + ' · savings ' + SAR(d.savings);
   renderAccounts(d.accounts||[]);

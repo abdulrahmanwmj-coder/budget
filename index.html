@@ -54,6 +54,7 @@
   details summary{list-style:none;cursor:pointer}details summary::-webkit-details-marker{display:none}
   .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:1px}
   .swatches{display:flex;gap:10px;flex-wrap:wrap;padding:12px 16px}.swatch{width:30px;height:30px;border-radius:50%;border:3px solid transparent;box-sizing:border-box}.swatch.on{border-color:var(--text)}.swatch.none{background:var(--line)}
+  .swatch.custom{background:conic-gradient(#FF3B30,#FFCC00,#34C759,#007AFF,#AF52DE,#FF3B30);color:#fff;font-size:20px;line-height:24px;text-align:center;position:relative;overflow:hidden}
   .link{color:var(--blue);background:none;border:0;font:inherit;font-size:15px;padding:0}
   .refresh{position:fixed;top:calc(14px + env(safe-area-inset-top));right:16px;width:36px;height:36px;border-radius:18px;border:0;background:var(--card);color:var(--blue);font-size:20px;line-height:36px;text-align:center;padding:0;z-index:5;box-shadow:0 1px 3px rgba(0,0,0,.15)}
   .refresh.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
@@ -223,7 +224,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '28';
+const APP_VERSION = '29';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -363,9 +364,9 @@ function saveBalances(){
   render(); syncing(true); toast('Saving…'); const my=++reqSeq;
   call('updateAccounts', list).then(d=>{settle(my,d); toast('Balances saved');}).catch(e=>{syncing(false);toast('Not saved: '+e.message); load();}); }
 let accRow=null;
-const COLORS=['','#FF3B30','#FF9500','#FFCC00','#34C759','#30B0C7','#007AFF','#5856D6','#AF52DE','#FF2D55','#A2845E','#8E8E93'];
+const COLORS=['','#FF3B30','#FF6B6B','#FF9500','#FFB340','#FFCC00','#FFE066','#34C759','#30D158','#00A86B','#1B998B','#30B0C7','#5AC8FA','#007AFF','#0A84FF','#003F88','#5856D6','#7B61FF','#AF52DE','#DA70D6','#FF2D55','#FF6FA3','#A2845E','#8B4513','#D2B48C','#8E8E93','#48484A','#FFFFFF'];
 let accColor='';
-function drawSwatches(){ $('aColors').innerHTML = COLORS.map(c=>'<div class="swatch'+(c?'':' none')+(c===accColor?' on':'')+'" style="'+(c?'background:'+c:'')+'" onclick="pickColor(\''+c+'\')"></div>').join(''); }
+function drawSwatches(){ const custom = accColor && COLORS.indexOf(accColor.toUpperCase())<0 && COLORS.indexOf(accColor)<0; $('aColors').innerHTML = COLORS.map(c=>'<div class="swatch'+(c?'':' none')+(c.toUpperCase()===(accColor||'').toUpperCase()?' on':'')+'" style="'+(c?'background:'+c+(c==='#FFFFFF'?';border-color:var(--line)':''):'')+'" onclick="pickColor(\''+c+'\')"></div>').join('') + '<label class="swatch custom'+(custom?' on':'')+'" style="'+(custom?'background:'+accColor:'')+'" title="Custom colour"><input type="color" value="'+(accColor||'#007AFF')+'" oninput="pickColor(this.value)" style="opacity:0;width:0;height:0;position:absolute">'+(custom?'':'+')+'</label>'; }
 function pickColor(c){ accColor=c; drawSwatches(); }
 function openAcc(row){ accRow=row; const a=row?(D.accounts||[]).find(x=>x.row===row):null; $('accTitle').textContent=a?'Edit account':'Add account'; $('aName').value=a?a.name:''; $('aKind').value=a?a.kind:'spend'; $('aDed').classList.toggle('on', !!(a&&a.deduct)); accColor=a?(a.color||''):''; drawSwatches(); $('aOrderRow').style.display=a?'flex':'none'; orderSub(); $('aDelete').style.display=a?'block':'none'; $('aDelete').textContent='Delete account'; accHint(); go('acc'); }
 function orderSub(){ const l=D.accounts||[]; const i=l.findIndex(x=>x.row===accRow); $('aOrderSub').textContent = i>=0 ? (i+1)+' of '+l.length : ''; }

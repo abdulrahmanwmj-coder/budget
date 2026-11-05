@@ -227,7 +227,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '30';
+const APP_VERSION = '31';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -358,18 +358,20 @@ function drawCycle(){
   let fixedDue=0, varDue=0; d.thisMonth.forEach(it=>{ if(it.fixed) fixedDue+=it.due; else varDue+=it.due; });
   const top = d.opening - d.moved;                       // spendable money after the savings move
   const plan = labels.map((_,k)=> top - fixedDue - varDue*(k+1)/nd);   // bills off at the start, bars burn down day by day
+  // "You" = money after the bills still to pay (so the gap to the plan line is exactly the Spending check);
+  // past points come from the log (plan at that day + the delta recorded then)
   const actual = labels.map(()=>null);
-  (d.log||[]).forEach(l=>{ const t=new Date(l.t); const k=Math.round((new Date(t.getFullYear(),t.getMonth(),t.getDate())-s0)/86400000); if(k>=0&&k<nd) actual[k]=l.current; });
-  if(el-1>=0 && el-1<nd) actual[el-1]=d.spendable;
-  for(let k=0;k<el-1;k++) if(actual[k]===null && k===0) actual[k]=top;   // start the actual line at the opening
-  const planEnd = plan[nd-1];
+  (d.log||[]).forEach(l=>{ if(l.delta===null||l.delta===undefined) return; const t=new Date(l.t); const k=Math.round((new Date(t.getFullYear(),t.getMonth(),t.getDate())-s0)/86400000); if(k>=0&&k<nd) actual[k]=plan[k]+l.delta; });
+  if(actual[0]===null) actual[0]=plan[0];
+  if(el-1>=0 && el-1<nd) actual[el-1]=plan[el-1]+d.spendDelta;
+  const planEnd = plan[nd-1]; const yTop = Math.max(plan[0], ...actual.filter(v=>v!==null));
   mk('cCycle',{type:'line',data:{labels:labels,datasets:[
-    {label:'You',data:actual,borderColor:'#007AFF',backgroundColor:'#007AFF',borderWidth:2.5,pointRadius:actual.map((v,k)=>k===el-1?4:0),tension:.2,spanGaps:true,order:1},
+    {label:'You (after bills)',data:actual,borderColor:'#007AFF',backgroundColor:'#007AFF',borderWidth:2.5,pointRadius:actual.map((v,k)=>k===el-1?4:0),tension:.2,spanGaps:true,order:1},
     {label:'Plan',data:plan,borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:0,order:2},
-    {label:'Today',data:labels.map((_,k)=>k===el-1?Math.max(top,0):null),type:'bar',backgroundColor:'rgba(142,142,147,.18)',barPercentage:1,categoryPercentage:1,order:3}
-  ]},options:{plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:11},filter:i=>i.text!=='Today'}},tooltip:{filter:i=>i.dataset.label!=='Today'}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:6}},y:{beginAtZero:true,grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}});
+    {label:'Today',data:labels.map((_,k)=>k===el-1?yTop:null),type:'bar',backgroundColor:'rgba(142,142,147,.18)',barPercentage:1,categoryPercentage:1,order:3}
+  ]},options:{plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:11},filter:i=>i.text!=='Today'}},tooltip:{filter:i=>i.dataset.label!=='Today'}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:6}},y:{grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}});
   const sg=(v)=>(v>=0?'+':'')+SAR(v);
-  $('cycSub').textContent = 'Blue = money in your spending accounts · dashed = where the plan says it should be · ends the cycle at '+SAR(planEnd)+' → that goes to savings. Now: '+sg(d.spendDelta)+' vs plan.';
+  $('cycSub').textContent = 'Blue = spending money minus bills still to pay · dashed = the plan (bars burn down day by day) · the plan ends the cycle at '+SAR(planEnd)+(planEnd<0?' (pull that back from savings or spend less)':' → move to savings')+'. Today: '+sg(d.spendDelta)+' vs plan.';
 }
 
 // ---- actions ----

@@ -9,6 +9,8 @@
 <meta name="theme-color" content="#000000">
 <title>Budget</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
 <style>
   :root{--bg:#F2F2F7;--card:#fff;--text:#000;--sub:#6e6e73;--line:#e5e5ea;--blue:#007AFF;--red:#FF3B30;--green:#34C759;--orange:#FF9500}
   @media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#fff;--sub:#98989d;--line:#2c2c2e}}
@@ -55,6 +57,9 @@
   .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:1px}
   .swatches{display:flex;gap:10px;flex-wrap:wrap;padding:12px 16px}.swatch{width:30px;height:30px;border-radius:50%;border:3px solid transparent;box-sizing:border-box}.swatch.on{border-color:var(--text)}.swatch.none{background:var(--line)}
   .swatch.custom{background:conic-gradient(#FF3B30,#FFCC00,#34C759,#007AFF,#AF52DE,#FF3B30);color:#fff;font-size:20px;line-height:24px;text-align:center;position:relative;overflow:hidden}
+  .zoomov{position:fixed;inset:0;background:var(--bg);z-index:60;display:none;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  .zoomov.on{display:flex}.zoomov .zh{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:15px;color:var(--sub)}.zoomov .zc{flex:1;padding:0 8px 12px;min-height:0;touch-action:none}
+  .chart canvas{cursor:zoom-in}
   .link{color:var(--blue);background:none;border:0;font:inherit;font-size:15px;padding:0}
   .refresh{position:fixed;top:calc(14px + env(safe-area-inset-top));right:16px;width:36px;height:36px;border-radius:18px;border:0;background:var(--card);color:var(--blue);font-size:20px;line-height:36px;text-align:center;padding:0;z-index:5;box-shadow:0 1px 3px rgba(0,0,0,.15)}
   .refresh.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
@@ -225,12 +230,13 @@
   <button class="tab" data-p="loan" onclick="go('loan')"><span class="ic">⌂</span>Home</button>
 </div>
 <div class="toast" id="toast"></div>
+<div class="zoomov" id="zoomov"><div class="zh"><span id="zTitle">Pinch to zoom · drag to pan</span><span><button class="link" onclick="zoomReset()" style="margin-right:18px">Reset</button><button class="link" onclick="closeZoom()">Done</button></span></div><div class="zc"><canvas id="cZoom"></canvas></div></div>
 
 <script>
-const APP_VERSION = '33';
+const APP_VERSION = '34';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
-let D = null, charts = {}, editRow = null, confirmEarly = false;
+let D = null, charts = {}, chartCfg = {}, zoomChart = null, editRow = null, confirmEarly = false;
 const SAR = v => (v === null || v === undefined || isNaN(v)) ? '—' : (v < 0 ? '−' : '') + 'SAR ' + Math.abs(v).toLocaleString('en-US', {maximumFractionDigits: 0});
 const $ = id => document.getElementById(id);
 const dark = () => matchMedia('(prefers-color-scheme: dark)').matches;
@@ -342,7 +348,23 @@ function rowHtml(t,d,v){ return '<div class="row"><div class="l"><div class="t">
 function fmtAdd(v){ if(/^\d{4}-\d{2}-\d{2}/.test(v)){ const p=v.slice(0,10).split('-'); const d=new Date(+p[0],+p[1]-1,+p[2]); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); } return v; }
 
 // ---- charts ----
-function mk(id, cfg){ if(charts[id]) charts[id].destroy(); const base = {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:cfg.data.datasets.length>1,labels:{boxWidth:10,font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}; cfg.options=Object.assign(base,cfg.options||{}); charts[id]=new Chart($(id),cfg); }
+function mk(id, cfg){ if(charts[id]) charts[id].destroy(); const base = {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:cfg.data.datasets.length>1,labels:{boxWidth:10,font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}; cfg.options=Object.assign(base,cfg.options||{}); charts[id]=new Chart($(id),cfg); chartCfg[id]=cfg; const cv=$(id); if(!cv.dataset.zoomBound){ cv.dataset.zoomBound='1'; cv.addEventListener('click',()=>openZoom(id)); } }
+// ---- full-screen chart with pinch zoom / pan ----
+const ZTITLES = {cCycle:'This cycle', cBalance:'Cumulative savings', cExpenses:'Expenses per cycle', cSave:'Savings per cycle', cLog:'Spending accounts vs plan', cLoan:'Rent vs buy'};
+function openZoom(id){ const cfg=chartCfg[id]; if(!cfg) return;
+  const o = Object.assign({}, cfg.options); o.plugins = Object.assign({}, cfg.options.plugins||{});
+  o.plugins.legend = Object.assign({}, o.plugins.legend||{}, {display:true, labels:Object.assign({}, (o.plugins.legend||{}).labels||{}, {font:{size:13}})});
+  o.plugins.zoom = {pan:{enabled:true,mode:'xy'}, zoom:{pinch:{enabled:true}, wheel:{enabled:true}, mode:'xy'}};
+  o.scales = {x:Object.assign({}, cfg.options.scales.x, {ticks:Object.assign({}, cfg.options.scales.x.ticks, {font:{size:12}, maxTicksLimit:12})}), y:Object.assign({}, cfg.options.scales.y, {ticks:Object.assign({}, cfg.options.scales.y.ticks, {font:{size:12}})})};
+  o.interaction = {mode:'nearest', intersect:false};
+  const data = {labels: cfg.data.labels.slice(), datasets: cfg.data.datasets.map(ds=>Object.assign({}, ds, {data: ds.data.slice()}))};
+  $('zTitle').textContent = (ZTITLES[id]||'Chart') + ' · pinch to zoom, drag to pan';
+  $('zoomov').classList.add('on'); document.body.style.overflow='hidden';
+  if(zoomChart) zoomChart.destroy();
+  zoomChart = new Chart($('cZoom'), {type: cfg.type, data: data, options: o});
+}
+function zoomReset(){ if(zoomChart && zoomChart.resetZoom) zoomChart.resetZoom(); }
+function closeZoom(){ $('zoomov').classList.remove('on'); document.body.style.overflow=''; if(zoomChart){ zoomChart.destroy(); zoomChart=null; } }
 function drawForecast(){ const f=D.forecast; mk('cBalance',{type:'line',data:{labels:f.map(x=>x.label),datasets:[{data:f.map(x=>x.cumulative),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,fill:{target:'origin',above:'rgba(0,122,255,.08)'}}]}}); mk('cExpenses',{type:'bar',data:{labels:f.slice(0,24).map(x=>x.label),datasets:[{data:f.slice(0,24).map(x=>x.expenses),backgroundColor:f.slice(0,24).map(x=>x.big?'#FF9500':'#007AFF'),borderRadius:3}]}}); }
 function drawSavings(){ const f=D.forecast.slice(0,24); mk('cSave',{type:'bar',data:{labels:f.map(x=>x.label),datasets:[{label:'Savings each cycle',data:f.map(x=>x.savings),backgroundColor:f.map(x=>x.savings<0?'#FF3B30':'#8e8e93'),borderRadius:3,order:2},{label:'Cumulative',type:'line',data:f.map(x=>x.cumulative),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,order:1}]}}); const l=D.log; if(!l.length){ if(charts.cLog){charts.cLog.destroy();delete charts.cLog;} const c=$('cLog').getContext('2d'); c.clearRect(0,0,$('cLog').width,$('cLog').height); $('cLog').parentElement.setAttribute('data-empty','1'); } else { $('cLog').parentElement.removeAttribute('data-empty'); mk('cLog',{type:'line',data:{labels:l.map(x=>new Date(x.t).toLocaleDateString('en-GB',{day:'numeric',month:'short'})),datasets:[{label:'Spending accounts',data:l.map(x=>x.current+(x.card||0)+(x.cash||0)),borderColor:'#007AFF',borderWidth:2,pointRadius:2,tension:.2},{label:'Plan',data:l.map(x=>x.expected),borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:.2}]}}); } }
 function drawLoan(){ const s=D.loanSeries; mk('cLoan',{type:'line',data:{labels:s.map(x=>x.label),datasets:[{label:'Keep renting',data:s.map(x=>x.rent),borderColor:'#8e8e93',borderWidth:2,pointRadius:0,tension:.2},{label:'Buy (cash + home − loan)',data:s.map(x=>x.wealth),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.2}]}}); }

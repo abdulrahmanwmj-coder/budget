@@ -227,7 +227,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '32';
+const APP_VERSION = '33';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -380,7 +380,7 @@ function drawCycle(){
       {label:'Plan',data:planTot,borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:0,order:0},
       {label:'Today',data:labels.map((_,k)=>k===el-1?Math.max(...planTot, ...totalA.filter(v=>v!==null)):null),type:'bar',backgroundColor:'rgba(142,142,147,.18)',barPercentage:1,categoryPercentage:1,order:3}
     ]},options:{plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:11},filter:i=>i.text!=='Today'}},tooltip:{filter:i=>i.dataset.label!=='Today'}},scales:{x:xs,y:Object.assign({beginAtZero:true},ys)}}});
-    $('cycSub').textContent = 'Blue = all your money (green part = savings), dashed = the plan. Money only leaves through spending, so the gap is your Spending check: '+sg(d.spendDelta)+'. The plan ends 26 Nov with '+SAR(endPlan)+' — all of it in savings (the cumulative target); at your current pace you would end with about '+SAR(endYou)+'.';
+    $('cycSub').textContent = 'Blue = everything you have after the bills still to pay (green part = savings) · dashed = the plan. Money only leaves through spending, so the gap is your Spending check: '+sg(d.spendDelta)+'. The plan ends 26 Nov with '+SAR(endPlan)+' — all of it in savings (the cumulative target); at your current pace you would end with about '+SAR(endYou)+'.';
   } else {
     const planEnd = plan[nd-1]; const yTop = Math.max(plan[0], ...actual.filter(v=>v!==null));
     mk('cCycle',{type:'line',data:{labels:labels,datasets:[

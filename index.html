@@ -89,6 +89,9 @@
   <button class="btn" id="btnBal" onclick="saveBalances()">Update balances</button>
   <button class="btn sec2" onclick="openAcc(null)">Add account</button>
 
+  <div class="sec" style="display:flex;justify-content:space-between;align-items:center"><span>This cycle at a glance</span><button class="link" id="cycBtn" onclick="toggleCycleChart()" style="font-size:13px">Hide</button></div>
+  <div class="card" id="cycCard"><div class="chart"><canvas id="cCycle"></canvas></div><div class="d" id="cycSub" style="font-size:13px;color:var(--sub);padding:0 16px 12px"></div></div>
+
   <div class="sec">Plan check</div>
   <div class="card">
     <div class="row"><div class="l"><div class="t">Spending</div><div class="d" id="pcSpendSub"></div></div><div class="v" id="pcSpend"></div></div>
@@ -224,7 +227,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '29';
+const APP_VERSION = '30';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -265,6 +268,7 @@ function render(){
   drawTotal();
   $('tHero').textContent = 'spending ' + SAR(d.spendable) + ' · savings ' + SAR(d.savings);
   renderAccounts(d.accounts||[]);
+  drawCycle();
   // plan check — spending accounts vs plan, savings account vs plan
   const sg = (v) => (v>=0?'+':'')+SAR(v);
   const ps=$('pcSpend'); ps.textContent = sg(d.spendDelta); ps.className='v '+(d.spendDelta>=0?'pos':'neg');
@@ -342,6 +346,31 @@ function mk(id, cfg){ if(charts[id]) charts[id].destroy(); const base = {respons
 function drawForecast(){ const f=D.forecast; mk('cBalance',{type:'line',data:{labels:f.map(x=>x.label),datasets:[{data:f.map(x=>x.cumulative),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,fill:{target:'origin',above:'rgba(0,122,255,.08)'}}]}}); mk('cExpenses',{type:'bar',data:{labels:f.slice(0,24).map(x=>x.label),datasets:[{data:f.slice(0,24).map(x=>x.expenses),backgroundColor:f.slice(0,24).map(x=>x.big?'#FF9500':'#007AFF'),borderRadius:3}]}}); }
 function drawSavings(){ const f=D.forecast.slice(0,24); mk('cSave',{type:'bar',data:{labels:f.map(x=>x.label),datasets:[{label:'Savings each cycle',data:f.map(x=>x.savings),backgroundColor:f.map(x=>x.savings<0?'#FF3B30':'#8e8e93'),borderRadius:3,order:2},{label:'Cumulative',type:'line',data:f.map(x=>x.cumulative),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,order:1}]}}); const l=D.log; if(!l.length){ if(charts.cLog){charts.cLog.destroy();delete charts.cLog;} const c=$('cLog').getContext('2d'); c.clearRect(0,0,$('cLog').width,$('cLog').height); $('cLog').parentElement.setAttribute('data-empty','1'); } else { $('cLog').parentElement.removeAttribute('data-empty'); mk('cLog',{type:'line',data:{labels:l.map(x=>new Date(x.t).toLocaleDateString('en-GB',{day:'numeric',month:'short'})),datasets:[{label:'Spending accounts',data:l.map(x=>x.current+(x.card||0)+(x.cash||0)),borderColor:'#007AFF',borderWidth:2,pointRadius:2,tension:.2},{label:'Plan',data:l.map(x=>x.expected),borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:.2}]}}); } }
 function drawLoan(){ const s=D.loanSeries; mk('cLoan',{type:'line',data:{labels:s.map(x=>x.label),datasets:[{label:'Keep renting',data:s.map(x=>x.rent),borderColor:'#8e8e93',borderWidth:2,pointRadius:0,tension:.2},{label:'Buy (cash + home − loan)',data:s.map(x=>x.wealth),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.2}]}}); }
+
+// ---- this-cycle chart: money to spend (plan vs actual) across the cycle ----
+let cycOn = true; try{ cycOn = localStorage.getItem('budgetCycChart')!=='0'; }catch(e){}
+function toggleCycleChart(){ cycOn=!cycOn; try{ localStorage.setItem('budgetCycChart', cycOn?'1':'0'); }catch(e){} drawCycle(); }
+function drawCycle(){
+  const d=D; $('cycCard').style.display = cycOn?'block':'none'; $('cycBtn').textContent = cycOn?'Hide':'Show';
+  if(!cycOn || !d.thisMonth) return;
+  const nd=d.cycle.days, el=d.cycle.elapsed; const p=d.cycle.start.slice(0,10).split('-'); const s0=new Date(+p[0],+p[1]-1,+p[2]);
+  const labels=[]; for(let k=0;k<nd;k++){ const x=new Date(s0); x.setDate(s0.getDate()+k); labels.push(x.toLocaleDateString('en-GB',{day:'numeric',month:'short'})); }
+  let fixedDue=0, varDue=0; d.thisMonth.forEach(it=>{ if(it.fixed) fixedDue+=it.due; else varDue+=it.due; });
+  const top = d.opening - d.moved;                       // spendable money after the savings move
+  const plan = labels.map((_,k)=> top - fixedDue - varDue*(k+1)/nd);   // bills off at the start, bars burn down day by day
+  const actual = labels.map(()=>null);
+  (d.log||[]).forEach(l=>{ const t=new Date(l.t); const k=Math.round((new Date(t.getFullYear(),t.getMonth(),t.getDate())-s0)/86400000); if(k>=0&&k<nd) actual[k]=l.current; });
+  if(el-1>=0 && el-1<nd) actual[el-1]=d.spendable;
+  for(let k=0;k<el-1;k++) if(actual[k]===null && k===0) actual[k]=top;   // start the actual line at the opening
+  const planEnd = plan[nd-1];
+  mk('cCycle',{type:'line',data:{labels:labels,datasets:[
+    {label:'You',data:actual,borderColor:'#007AFF',backgroundColor:'#007AFF',borderWidth:2.5,pointRadius:actual.map((v,k)=>k===el-1?4:0),tension:.2,spanGaps:true,order:1},
+    {label:'Plan',data:plan,borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:0,order:2},
+    {label:'Today',data:labels.map((_,k)=>k===el-1?Math.max(top,0):null),type:'bar',backgroundColor:'rgba(142,142,147,.18)',barPercentage:1,categoryPercentage:1,order:3}
+  ]},options:{plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:11},filter:i=>i.text!=='Today'}},tooltip:{filter:i=>i.dataset.label!=='Today'}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:6}},y:{beginAtZero:true,grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}});
+  const sg=(v)=>(v>=0?'+':'')+SAR(v);
+  $('cycSub').textContent = 'Blue = money in your spending accounts · dashed = where the plan says it should be · ends the cycle at '+SAR(planEnd)+' → that goes to savings. Now: '+sg(d.spendDelta)+' vs plan.';
+}
 
 // ---- actions ----
 function busy(b){ document.querySelectorAll('.btn').forEach(x=>x.disabled=b); }

@@ -89,7 +89,7 @@
   <button class="btn" id="btnBal" onclick="saveBalances()">Update balances</button>
   <button class="btn sec2" onclick="openAcc(null)">Add account</button>
 
-  <div class="sec" style="display:flex;justify-content:space-between;align-items:center"><span>This cycle at a glance</span><button class="link" id="cycBtn" onclick="toggleCycleChart()" style="font-size:13px">Hide</button></div>
+  <div class="sec" style="display:flex;justify-content:space-between;align-items:center"><span>This cycle at a glance</span><span><button class="link" id="cycModeBtn" onclick="toggleCycleMode()" style="font-size:13px;margin-right:14px">Full picture</button><button class="link" id="cycBtn" onclick="toggleCycleChart()" style="font-size:13px">Hide</button></span></div>
   <div class="card" id="cycCard"><div class="chart"><canvas id="cCycle"></canvas></div><div class="d" id="cycSub" style="font-size:13px;color:var(--sub);padding:0 16px 12px"></div></div>
 
   <div class="sec">Plan check</div>
@@ -227,7 +227,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '31';
+const APP_VERSION = '32';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, editRow = null, confirmEarly = false;
@@ -350,28 +350,46 @@ function drawLoan(){ const s=D.loanSeries; mk('cLoan',{type:'line',data:{labels:
 // ---- this-cycle chart: money to spend (plan vs actual) across the cycle ----
 let cycOn = true; try{ cycOn = localStorage.getItem('budgetCycChart')!=='0'; }catch(e){}
 function toggleCycleChart(){ cycOn=!cycOn; try{ localStorage.setItem('budgetCycChart', cycOn?'1':'0'); }catch(e){} drawCycle(); }
+let cycMode = 'spend'; try{ cycMode = localStorage.getItem('budgetCycMode')==='full'?'full':'spend'; }catch(e){}
+function toggleCycleMode(){ cycMode = cycMode==='full'?'spend':'full'; try{ localStorage.setItem('budgetCycMode', cycMode); }catch(e){} drawCycle(); }
 function drawCycle(){
   const d=D; $('cycCard').style.display = cycOn?'block':'none'; $('cycBtn').textContent = cycOn?'Hide':'Show';
+  $('cycModeBtn').style.display = cycOn?'inline':'none'; $('cycModeBtn').textContent = cycMode==='full' ? 'Spending only' : 'Full picture';
   if(!cycOn || !d.thisMonth) return;
   const nd=d.cycle.days, el=d.cycle.elapsed; const p=d.cycle.start.slice(0,10).split('-'); const s0=new Date(+p[0],+p[1]-1,+p[2]);
   const labels=[]; for(let k=0;k<nd;k++){ const x=new Date(s0); x.setDate(s0.getDate()+k); labels.push(x.toLocaleDateString('en-GB',{day:'numeric',month:'short'})); }
   let fixedDue=0, varDue=0; d.thisMonth.forEach(it=>{ if(it.fixed) fixedDue+=it.due; else varDue+=it.due; });
-  const top = d.opening - d.moved;                       // spendable money after the savings move
+  const top = d.opening - d.moved;                                   // spending money after the savings move
   const plan = labels.map((_,k)=> top - fixedDue - varDue*(k+1)/nd);   // bills off at the start, bars burn down day by day
-  // "You" = money after the bills still to pay (so the gap to the plan line is exactly the Spending check);
-  // past points come from the log (plan at that day + the delta recorded then)
-  const actual = labels.map(()=>null);
-  (d.log||[]).forEach(l=>{ if(l.delta===null||l.delta===undefined) return; const t=new Date(l.t); const k=Math.round((new Date(t.getFullYear(),t.getMonth(),t.getDate())-s0)/86400000); if(k>=0&&k<nd) actual[k]=plan[k]+l.delta; });
-  if(actual[0]===null) actual[0]=plan[0];
-  if(el-1>=0 && el-1<nd) actual[el-1]=plan[el-1]+d.spendDelta;
-  const planEnd = plan[nd-1]; const yTop = Math.max(plan[0], ...actual.filter(v=>v!==null));
-  mk('cCycle',{type:'line',data:{labels:labels,datasets:[
-    {label:'You (after bills)',data:actual,borderColor:'#007AFF',backgroundColor:'#007AFF',borderWidth:2.5,pointRadius:actual.map((v,k)=>k===el-1?4:0),tension:.2,spanGaps:true,order:1},
-    {label:'Plan',data:plan,borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:0,order:2},
-    {label:'Today',data:labels.map((_,k)=>k===el-1?yTop:null),type:'bar',backgroundColor:'rgba(142,142,147,.18)',barPercentage:1,categoryPercentage:1,order:3}
-  ]},options:{plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:11},filter:i=>i.text!=='Today'}},tooltip:{filter:i=>i.dataset.label!=='Today'}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:6}},y:{grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}});
+  // "after bills" = spending money minus the bills still to pay (gap to the plan line = the Spending check); past points from the log
+  const actual = labels.map(()=>null), sav = labels.map(()=>null);
+  (d.log||[]).forEach(l=>{ if(l.delta===null||l.delta===undefined) return; const t=new Date(l.t); const k=Math.round((new Date(t.getFullYear(),t.getMonth(),t.getDate())-s0)/86400000); if(k>=0&&k<nd){ actual[k]=plan[k]+l.delta; sav[k]=l.savings; } });
+  if(actual[0]===null){ actual[0]=plan[0]; sav[0]=d.savingsStart; }
+  if(el-1>=0 && el-1<nd){ actual[el-1]=plan[el-1]+d.spendDelta; sav[el-1]=d.savings; }
   const sg=(v)=>(v>=0?'+':'')+SAR(v);
-  $('cycSub').textContent = 'Blue = spending money minus bills still to pay · dashed = the plan (bars burn down day by day) · the plan ends the cycle at '+SAR(planEnd)+(planEnd<0?' (pull that back from savings or spend less)':' → move to savings')+'. Today: '+sg(d.spendDelta)+' vs plan.';
+  const xs={grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:6}};
+  const ys={grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}};
+  if(cycMode==='full'){
+    // everything you own (savings + spending after bills) vs the plan; the plan ends with all remaining money in savings = cumulative target
+    const planTot = plan.map(v => v + d.savingsStart + d.moved);          // = opening + savingsStart − fixed − bars so far; ends at cumTarget
+    const totalA = labels.map((_,k)=> actual[k]===null||sav[k]===null ? null : actual[k]+sav[k]);
+    const endPlan = planTot[nd-1], endYou = endPlan + d.spendDelta;
+    mk('cCycle',{type:'line',data:{labels:labels,datasets:[
+      {label:'Of which savings',data:sav,borderColor:'#34C759',backgroundColor:'rgba(52,199,89,.18)',fill:'origin',borderWidth:2,pointRadius:0,tension:.2,spanGaps:true,order:2},
+      {label:'Total (savings + spending after bills)',data:totalA,borderColor:'#007AFF',backgroundColor:'rgba(0,122,255,.10)',fill:'-1',borderWidth:2.5,pointRadius:totalA.map((v,k)=>k===el-1?4:0),tension:.2,spanGaps:true,order:1},
+      {label:'Plan',data:planTot,borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:0,order:0},
+      {label:'Today',data:labels.map((_,k)=>k===el-1?Math.max(...planTot, ...totalA.filter(v=>v!==null)):null),type:'bar',backgroundColor:'rgba(142,142,147,.18)',barPercentage:1,categoryPercentage:1,order:3}
+    ]},options:{plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:11},filter:i=>i.text!=='Today'}},tooltip:{filter:i=>i.dataset.label!=='Today'}},scales:{x:xs,y:Object.assign({beginAtZero:true},ys)}}});
+    $('cycSub').textContent = 'Blue = all your money (green part = savings), dashed = the plan. Money only leaves through spending, so the gap is your Spending check: '+sg(d.spendDelta)+'. The plan ends 26 Nov with '+SAR(endPlan)+' — all of it in savings (the cumulative target); at your current pace you would end with about '+SAR(endYou)+'.';
+  } else {
+    const planEnd = plan[nd-1]; const yTop = Math.max(plan[0], ...actual.filter(v=>v!==null));
+    mk('cCycle',{type:'line',data:{labels:labels,datasets:[
+      {label:'You (after bills)',data:actual,borderColor:'#007AFF',backgroundColor:'#007AFF',borderWidth:2.5,pointRadius:actual.map((v,k)=>k===el-1?4:0),tension:.2,spanGaps:true,order:1},
+      {label:'Plan',data:plan,borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:0,order:2},
+      {label:'Today',data:labels.map((_,k)=>k===el-1?yTop:null),type:'bar',backgroundColor:'rgba(142,142,147,.18)',barPercentage:1,categoryPercentage:1,order:3}
+    ]},options:{plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:11},filter:i=>i.text!=='Today'}},tooltip:{filter:i=>i.dataset.label!=='Today'}},scales:{x:xs,y:ys}}});
+    $('cycSub').textContent = 'Blue = spending money minus bills still to pay · dashed = the plan (bars burn down day by day). Today: '+sg(d.spendDelta)+' vs plan.' + (planEnd<0 ? ' The plan line ends at '+SAR(planEnd)+' only because '+SAR(-planEnd)+' more than planned is sitting in savings — see Full picture.' : ' The plan ends the cycle with '+SAR(planEnd)+' to move to savings.');
+  }
 }
 
 // ---- actions ----

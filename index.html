@@ -233,7 +233,7 @@
 <div class="zoomov" id="zoomov"><div class="zh"><span id="zTitle">Pinch to zoom · drag to pan</span><span><button class="link" onclick="zoomReset()" style="margin-right:18px">Reset</button><button class="link" onclick="closeZoom()">Done</button></span></div><div class="zc"><canvas id="cZoom"></canvas></div></div>
 
 <script>
-const APP_VERSION = '34';
+const APP_VERSION = '35';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, chartCfg = {}, zoomChart = null, editRow = null, confirmEarly = false;
@@ -354,7 +354,7 @@ const ZTITLES = {cCycle:'This cycle', cBalance:'Cumulative savings', cExpenses:'
 function openZoom(id){ const cfg=chartCfg[id]; if(!cfg) return;
   const o = Object.assign({}, cfg.options); o.plugins = Object.assign({}, cfg.options.plugins||{});
   o.plugins.legend = Object.assign({}, o.plugins.legend||{}, {display:true, labels:Object.assign({}, (o.plugins.legend||{}).labels||{}, {font:{size:13}})});
-  o.plugins.zoom = {pan:{enabled:true,mode:'xy'}, zoom:{pinch:{enabled:true}, wheel:{enabled:true}, mode:'xy'}};
+  o.plugins.zoom = {pan:{enabled:true,mode:'xy'}, zoom:{pinch:{enabled:true}, wheel:{enabled:true}, mode:'xy'}, limits:{x:{min:'original',max:'original',minRange:3}, y:{min:'original',max:'original',minRange:500}}};
   o.scales = {x:Object.assign({}, cfg.options.scales.x, {ticks:Object.assign({}, cfg.options.scales.x.ticks, {font:{size:12}, maxTicksLimit:12})}), y:Object.assign({}, cfg.options.scales.y, {ticks:Object.assign({}, cfg.options.scales.y.ticks, {font:{size:12}})})};
   o.interaction = {mode:'nearest', intersect:false};
   const data = {labels: cfg.data.labels.slice(), datasets: cfg.data.datasets.map(ds=>Object.assign({}, ds, {data: ds.data.slice()}))};

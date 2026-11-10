@@ -233,7 +233,7 @@
 <div class="zoomov" id="zoomov"><div class="zh"><span id="zTitle">Pinch to zoom · drag to pan</span><span><button class="link" onclick="zoomReset()" style="margin-right:18px">Reset</button><button class="link" onclick="closeZoom()">Done</button></span></div><div class="zc"><canvas id="cZoom"></canvas></div></div>
 
 <script>
-const APP_VERSION = '35';
+const APP_VERSION = '36';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, chartCfg = {}, zoomChart = null, editRow = null, confirmEarly = false;
@@ -365,7 +365,12 @@ function openZoom(id){ const cfg=chartCfg[id]; if(!cfg) return;
 }
 function zoomReset(){ if(zoomChart && zoomChart.resetZoom) zoomChart.resetZoom(); }
 function closeZoom(){ $('zoomov').classList.remove('on'); document.body.style.overflow=''; if(zoomChart){ zoomChart.destroy(); zoomChart=null; } }
-function drawForecast(){ const f=D.forecast; mk('cBalance',{type:'line',data:{labels:f.map(x=>x.label),datasets:[{data:f.map(x=>x.cumulative),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,fill:{target:'origin',above:'rgba(0,122,255,.08)'}}]}}); mk('cExpenses',{type:'bar',data:{labels:f.slice(0,24).map(x=>x.label),datasets:[{data:f.slice(0,24).map(x=>x.expenses),backgroundColor:f.slice(0,24).map(x=>x.big?'#FF9500':'#007AFF'),borderRadius:3}]}}); }
+function drawForecast(){ const f=D.forecast; const ci=f.findIndex(x=>x.key===D.cycle.key); const nowPt=f.map((x,i)=>i===ci?D.savings:null); const yMax=Math.max(...f.map(x=>x.cumulative), D.savings);
+  mk('cBalance',{type:'line',data:{labels:f.map(x=>x.label),datasets:[
+    {label:'Plan (end of each cycle)',data:f.map(x=>x.cumulative),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,fill:{target:'origin',above:'rgba(0,122,255,.08)'},order:2},
+    {label:'Savings now',data:nowPt,borderColor:'#34C759',backgroundColor:'#34C759',pointRadius:6,pointHoverRadius:8,showLine:false,order:1},
+    {label:'Now',data:f.map((x,i)=>i===ci?yMax:null),type:'bar',backgroundColor:'rgba(142,142,147,.18)',barPercentage:1,categoryPercentage:1,order:3}
+  ]},options:{plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:11},filter:i=>i.text!=='Now'}},tooltip:{filter:i=>i.dataset.label!=='Now'}}}}); mk('cExpenses',{type:'bar',data:{labels:f.slice(0,24).map(x=>x.label),datasets:[{data:f.slice(0,24).map(x=>x.expenses),backgroundColor:f.slice(0,24).map(x=>x.big?'#FF9500':'#007AFF'),borderRadius:3}]}}); }
 function drawSavings(){ const f=D.forecast.slice(0,24); mk('cSave',{type:'bar',data:{labels:f.map(x=>x.label),datasets:[{label:'Savings each cycle',data:f.map(x=>x.savings),backgroundColor:f.map(x=>x.savings<0?'#FF3B30':'#8e8e93'),borderRadius:3,order:2},{label:'Cumulative',type:'line',data:f.map(x=>x.cumulative),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.25,order:1}]}}); const l=D.log; if(!l.length){ if(charts.cLog){charts.cLog.destroy();delete charts.cLog;} const c=$('cLog').getContext('2d'); c.clearRect(0,0,$('cLog').width,$('cLog').height); $('cLog').parentElement.setAttribute('data-empty','1'); } else { $('cLog').parentElement.removeAttribute('data-empty'); mk('cLog',{type:'line',data:{labels:l.map(x=>new Date(x.t).toLocaleDateString('en-GB',{day:'numeric',month:'short'})),datasets:[{label:'Spending accounts',data:l.map(x=>x.current+(x.card||0)+(x.cash||0)),borderColor:'#007AFF',borderWidth:2,pointRadius:2,tension:.2},{label:'Plan',data:l.map(x=>x.expected),borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,tension:.2}]}}); } }
 function drawLoan(){ const s=D.loanSeries; mk('cLoan',{type:'line',data:{labels:s.map(x=>x.label),datasets:[{label:'Keep renting',data:s.map(x=>x.rent),borderColor:'#8e8e93',borderWidth:2,pointRadius:0,tension:.2},{label:'Buy (cash + home − loan)',data:s.map(x=>x.wealth),borderColor:'#007AFF',borderWidth:2,pointRadius:0,tension:.2}]}}); }
 

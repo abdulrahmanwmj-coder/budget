@@ -87,8 +87,23 @@ function cycleLabelOf(c) { return fmt(c.cs, 'd MMM') + ' – ' + fmt(c.ce, 'd MM
 function paidMap(mk) {
   const rows = sh(PAID).getDataRange().getValues().slice(1);
   const o = {};
-  rows.forEach(r => { if (String(r[0]) === mk) o[String(r[1])] = { state: String(r[2]), when: isDate(r[3]) ? r[3] : null }; });
+  rows.forEach(r => { if (String(r[0]) === mk) o[String(r[1])] = { state: String(r[2]), when: isDate(r[3]) ? r[3] : null, deducted: num(r[4]) }; });
   return o;
+}
+// Payment history: every item marked paid, newest first (App Paid sheet). Amount = what the tick deducted, else what was due that cycle.
+function paymentHistory(items, settings, limit) {
+  const rows = sh(PAID).getDataRange().getValues().slice(1).filter(r => String(r[2]) === 'paid' && isDate(r[3]));
+  rows.sort((a, b) => b[3] - a[3]);
+  const out = []; const cyc = {};
+  rows.slice(0, limit || 60).forEach(r => {
+    const mk = String(r[0]); const name = String(r[1]);
+    if (!cyc[mk]) { const m = mk.match(/^M(\d{4})-(\d{2})$/); cyc[mk] = m ? cycleByMonth(new Date(+m[1], +m[2] - 1, 1), settings) : null; }
+    const c = cyc[mk]; const it = items.find(x => x.item === name);
+    let amt = num(r[4]);
+    if (!(amt > 0) && it && c) amt = dueInWindow(it, c.cs, c.ce);
+    out.push({ cycle: mk, cycleLabel: c ? cycleLabelOf(c) : mk, item: name, when: r[3].toISOString(), amount: Math.round(amt * 100) / 100, big: it ? BIG.indexOf(it.freq) >= 0 : false, deducted: num(r[4]) > 0 });
+  });
+  return out;
 }
 
 function ensureAppSheets() {
@@ -376,7 +391,7 @@ function getData() {
     if (isFixed) { rem = paid ? 0 : due; done = paid ? due : 0; }
     else { rem = due * left / nd; done = due - rem; }
     planned += due; remaining += rem; spentPlan += done; if (!isFixed) remainingVar += rem;
-    thisMonth.push({ row: it.row, item: it.item, freq: it.freq, due: due, remaining: rem, done: done, paid: paid, fixed: isFixed, spread: spread, big: BIG.indexOf(it.freq) >= 0, defPaid: defPaid, perDay: isFixed ? 0 : due / nd, perWeek: !isFixed && !!settings.perWeek[it.item] });
+    thisMonth.push({ row: it.row, item: it.item, freq: it.freq, due: due, remaining: rem, done: done, paid: paid, paidAt: (o && o.when) ? o.when.toISOString() : null, fixed: isFixed, spread: spread, big: BIG.indexOf(it.freq) >= 0, defPaid: defPaid, perDay: isFixed ? 0 : due / nd, perWeek: !isFixed && !!settings.perWeek[it.item] });
   });
   thisMonth.sort((a, b) => (a.fixed === b.fixed) ? b.due - a.due : (a.fixed ? -1 : 1)); // switches first, then bars; largest first
 
@@ -455,7 +470,8 @@ function getData() {
     expectedSpendable: expectedSpendable, spendDelta: spendDelta, closing: closing,
     thisMonth: thisMonth, future: future, forecast: forecast, log: log,
     items: items.map(it => ({ row: it.row, item: it.item, amount: it.amount, freq: it.freq, monthly: it.monthly, annually: it.annually, add: it.add, stop: it.stop, spread: it.freq === 'Monthly' && !!settings.spread[it.item], perWeek: !!settings.perWeek[it.item] })),
-    loan: loan, loanSeries: loanSeries
+    loan: loan, loanSeries: loanSeries,
+    payments: paymentHistory(items, settings, 60)
   };
 }
 function r3(r) { return r[3] !== '' ? r[3] : num(r[1]) + num(r[2]); }

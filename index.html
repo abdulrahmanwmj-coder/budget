@@ -116,6 +116,12 @@
     <div class="row"><div class="l"><div class="t">Closing balance</div><div class="d">what will be left on the last day — move it to savings then</div></div><div class="v" id="tmClose"></div></div>
   </div>
 
+  <div class="sec">Daily spending vs plan</div>
+  <div class="card"><div class="chart"><canvas id="cDaily"></canvas></div><div id="dailySub" style="font-size:13px;color:var(--sub);padding:0 16px 12px"></div></div>
+
+  <div class="sec">Payments history</div>
+  <div class="card" id="payHist"></div>
+
   <div class="sec">Coming up</div>
   <div class="card" id="upcoming"></div>
 </div>
@@ -233,7 +239,7 @@
 <div class="zoomov" id="zoomov"><div class="zh"><span id="zTitle">Pinch to zoom · drag to pan</span><span><button class="link" onclick="zoomReset()" style="margin-right:18px">Reset</button><button class="link" onclick="closeZoom()">Done</button></span></div><div class="zc"><canvas id="cZoom"></canvas></div></div>
 
 <script>
-const APP_VERSION = '39';
+const APP_VERSION = '40';
 // reload the page itself when a newer version has been published (home-screen apps cache the old one)
 (function(){ try{ fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m=t.match(/APP_VERSION = '(\d+)'/); if(m && m[1]!==APP_VERSION) location.reload(); }).catch(()=>{}); }catch(e){} })();
 let D = null, charts = {}, chartCfg = {}, zoomChart = null, editRow = null, confirmEarly = false;
@@ -274,7 +280,7 @@ function render(){
   drawTotal();
   $('tHero').textContent = 'spending ' + SAR(d.spendable) + ' · savings ' + SAR(d.savings);
   renderAccounts(d.accounts||[]);
-  drawCycle();
+  drawCycle(); drawDaily(); renderPayments();
   // plan check — spending accounts vs plan, savings account vs plan
   const sg = (v) => (v>=0?'+':'')+SAR(v);
   const ps=$('pcSpend'); ps.textContent = sg(d.spendDelta); ps.className='v '+(d.spendDelta>=0?'pos':'neg');
@@ -350,7 +356,7 @@ function fmtAdd(v){ if(/^\d{4}-\d{2}-\d{2}/.test(v)){ const p=v.slice(0,10).spli
 // ---- charts ----
 function mk(id, cfg){ if(charts[id]) charts[id].destroy(); const base = {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:cfg.data.datasets.length>1,labels:{boxWidth:10,font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}; cfg.options=Object.assign(base,cfg.options||{}); charts[id]=new Chart($(id),cfg); chartCfg[id]=cfg; const cv=$(id); if(!cv.dataset.zoomBound){ cv.dataset.zoomBound='1'; cv.addEventListener('click',()=>openZoom(id)); } }
 // ---- full-screen chart with pinch zoom / pan ----
-const ZTITLES = {cCycle:'This cycle', cBalance:'Cumulative savings', cExpenses:'Expenses per cycle', cSave:'Savings per cycle', cLog:'Spending accounts vs plan', cLoan:'Rent vs buy'};
+const ZTITLES = {cCycle:'This cycle', cDaily:'Daily spending vs plan', cBalance:'Cumulative savings', cExpenses:'Expenses per cycle', cSave:'Savings per cycle', cLog:'Spending accounts vs plan', cLoan:'Rent vs buy'};
 function openZoom(id){ const cfg=chartCfg[id]; if(!cfg) return;
   const o = Object.assign({}, cfg.options); o.plugins = Object.assign({}, cfg.options.plugins||{});
   o.plugins.legend = Object.assign({}, o.plugins.legend||{}, {display:true, labels:Object.assign({}, (o.plugins.legend||{}).labels||{}, {font:{size:13}})});
@@ -426,6 +432,38 @@ function drawCycle(){
     ]},options:{plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:11},filter:i=>i.text!=='Today'}},tooltip:{filter:i=>i.dataset.label!=='Today'}},scales:{x:xs,y:ys}}});
     $('cycSub').textContent = 'Blue = spending money minus bills still to pay · dashed = the plan (bars burn down day by day). Today: '+sg(d.spendDelta)+' vs plan.'+redNote+' Here it is drawn net of what savings already holds'+(redSp[nd-1]<0?' (below zero = savings alone already cover it)':'')+'.' + (planEnd<0 ? ' The plan line ends at '+SAR(planEnd)+' only because '+SAR(-planEnd)+' more than planned is sitting in savings — see Full picture.' : ' The plan ends the cycle with '+SAR(planEnd)+' to move to savings.');
   }
+}
+
+// ---- daily spending (bar items) vs the plan's per-day allowance ----
+function drawDaily(){
+  const d=D; if(!d.thisMonth) return;
+  const nd=d.cycle.days, el=d.cycle.elapsed; const p=d.cycle.start.slice(0,10).split('-'); const s0=new Date(+p[0],+p[1]-1,+p[2]);
+  let varDue=0; d.thisMonth.forEach(it=>{ if(!it.fixed) varDue+=it.due; }); const perDay=varDue/nd;
+  const labels=[]; for(let k=0;k<nd;k++){ const x=new Date(s0); x.setDate(s0.getDate()+k); labels.push(x.toLocaleDateString('en-GB',{day:'numeric',month:'short'})); }
+  // cumulative actual spending on bar items up to day k = planned-so-far − (how far under plan you were that day)
+  const known={}; (d.log||[]).forEach(l=>{ if(l.delta===null||l.delta===undefined) return; const t=new Date(l.t); const k=Math.round((new Date(t.getFullYear(),t.getMonth(),t.getDate())-s0)/86400000); if(k>=0&&k<el) known[k]=perDay*(k+1)-l.delta; });
+  if(el-1>=0) known[el-1]=perDay*el-d.spendDelta;
+  const cum=[]; let prevK=-1, prevV=0;
+  for(let k=0;k<el;k++){ if(known[k]!==undefined){ const v=known[k]; const span=k-prevK; for(let j=prevK+1;j<=k;j++) cum[j]=prevV+(v-prevV)*(j-prevK)/span; prevK=k; prevV=v; } }
+  for(let k=prevK+1;k<el;k++) cum[k]=prevV;
+  const daily=cum.map((v,k)=>Math.max(0, v-(k?cum[k-1]:0)));
+  while(daily.length<nd) daily.push(null);
+  const est = {}; let last=-1; Object.keys(known).map(Number).sort((a,b)=>a-b).forEach(k=>{ for(let j=last+1;j<k;j++) est[j]=1; last=k; });
+  mk('cDaily',{type:'bar',data:{labels:labels,datasets:[
+    {label:'Spent per day',data:daily,backgroundColor:daily.map((v,k)=>v===null?'transparent':(est[k]?'rgba(0,122,255,.35)':(v>perDay?'#FF3B30':'#007AFF'))),borderRadius:3,order:2},
+    {label:'Plan '+Math.round(perDay)+'/day',data:labels.map(()=>perDay),type:'line',borderColor:'#8e8e93',borderWidth:2,borderDash:[4,4],pointRadius:0,order:1}
+  ]},options:{plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:6}},y:{beginAtZero:true,grid:{color:dark()?'#2c2c2e':'#e5e5ea'},ticks:{font:{size:10},callback:v=>Math.round(v)}}}}});
+  const spent=cum[el-1]||0, planned=perDay*el;
+  $('dailySub').textContent = 'Day-to-day items only (groceries, fuel, restaurants…). So far '+SAR(spent)+' in '+el+' days = '+SAR(spent/el)+'/day vs plan '+SAR(perDay)+'/day ('+SAR(planned)+' planned so far). Lighter bars = days between two balance updates, averaged.';
+}
+// ---- payments history (ticked items, newest first) ----
+function renderPayments(){
+  const ps=(D.payments||[]); const el=$('payHist'); if(!el) return;
+  if(!ps.length){ el.innerHTML='<div class="row"><div class="l"><div class="d">Nothing ticked yet</div></div></div>'; return; }
+  let h='', lastCycle=null;
+  ps.slice(0,40).forEach(x=>{ const dt=new Date(x.when).toLocaleDateString('en-GB',{day:'numeric',month:'short'}); if(x.cycle!==lastCycle){ h+='<div class="row" style="min-height:0;padding:8px 16px"><div class="l"><div class="d">'+(x.cycle===D.cycle.key?'This cycle · ':'')+x.cycleLabel+'</div></div></div>'; lastCycle=x.cycle; }
+    h+='<div class="row"><div class="l"><div class="t">'+escH(x.item)+(x.big?' <span class="pill">big</span>':'')+'</div><div class="d">paid '+dt+(x.deducted?'':' · not deducted (assumed paid)')+'</div></div><div class="v">'+SAR(x.amount)+'</div></div>'; });
+  el.innerHTML=h;
 }
 
 // ---- actions ----
